@@ -148,3 +148,27 @@ ORDER BY Country ASC, Medals DESC;
 ![](images/dense-rank-partition.png)
 
 ### PAGING
+
+**Definition** : Splitting data into equal chunks
+
+#### NTILE
+
+`NTITLE(n)` splits data into `n` approximately equal pages
+
+``` sql
+WITH Disciplines AS (
+  SELECT
+    DISTINCT Discipline
+  FROM Summer_Medals
+)
+SELECT
+  Discipline,
+  NTILE(15) OVER (ORDER BY
+  Discipline ASC) AS Page -- Divides the disciplines into 15 approximately equal groups (pages)
+FROM Disciplines
+ORDER BY
+  Page ASC;
+```
+
+
+![](images/NTITLE.png)
