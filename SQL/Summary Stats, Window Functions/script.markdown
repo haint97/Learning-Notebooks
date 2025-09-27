@@ -172,3 +172,60 @@ ORDER BY
 
 
 ![](images/NTITLE.png)
+
+
+### AGGREGATE WINDOW FUNCTION
+
+#### MAX window function
+
+Show max medals earned so far for each row.
+
+``` sql
+WITH Brazil_Medals AS (
+  -- This Common Table Expression (CTE) is assumed to select the Year and the total count of medals for Brazil.
+  -- The exact query inside the parentheses is not shown, but it would look something like this:
+  -- SELECT Year, COUNT(*) AS Medals
+  -- FROM Summer_Medals
+  -- WHERE Country = 'BRA'
+  -- GROUP BY Year
+  -- ORDER BY Year ASC
+)
+SELECT
+  Year,
+  Medals,
+  -- This is a window function that calculates the running maximum of medals up to the current year.
+  MAX(Medals) OVER (ORDER BY Year ASC) AS Max_Medals
+FROM Brazil_Medals;
+```
+![](images/max-window-function.png)
+
+
+
+
+#### SUM window function
+
+Calculates  the cumulative sum or running total of the medals earned so far.
+
+``` sql
+WITH Brazil_Medals AS (
+  -- This CTE is assumed to select the Year and the total number of medals for Brazil.
+  -- The query would be something like this:
+  -- SELECT Year, COUNT(*) AS Medals
+  -- FROM Summer_Medals
+  -- WHERE Country = 'BRA'
+  -- GROUP BY Year
+  -- ORDER BY Year ASC
+)
+SELECT
+  Year,
+  Medals,
+  -- This window function calculates the running total of medals up to the current year.
+  SUM(Medals) OVER (ORDER BY Year ASC) AS Medals_RT -- RT stands for Running Total
+FROM Brazil_Medals;
+```
+![](images/sum-window-function.png)
+
+
+
+``` sql
+```
