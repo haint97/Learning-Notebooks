@@ -380,3 +380,365 @@ ORDER BY Year ASC;
 | 2012 | 24     | 32         | 24               |
 
 ##### Moving averages and totals
+
+- Moving Average: average of a set number of previous rows and the current row
+- Moving Total: sum of a set number of previous rows and the current row
+
+
+``` sql
+WITH Brazil_Medals AS (
+  -- This CTE is assumed to select the Year and the total number of medals for Brazil.
+  -- The query would be something like this:
+  -- SELECT Year, COUNT(*) AS Medals
+  -- FROM Summer_Medals
+  -- WHERE Country = 'BRA'
+  -- GROUP BY Year
+  -- ORDER BY Year ASC
+)
+SELECT
+  Year,
+  Medals,
+  -- Moving Average over the last 3 years
+  AVG(Medals) OVER (
+    ORDER BY Year ASC
+    -- Defines a frame / window that includes the current row and the two preceding rows
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+  ) AS Moving_Avg_3,
+  -- Moving Total over the last 3 years
+  SUM(Medals) OVER (
+    ORDER BY Year ASC
+    -- Defines a frame / window that includes the current row and the two preceding rows
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+  ) AS Moving_Total_3
+FROM Brazil_Medals;
+```
+| Year | Medals | Moving_Avg_3 | Moving_Total_3 |
+|------|--------|---------------|------------------|
+| 1996 | 15     | 15.0          | 15               |
+| 2000 | 12     | 13.5          | 27               |
+| 2004 | 10     | 12.33         | 37               |
+| 2008 | 15     | 12.33         | 37               |
+| 2012 | 17     | 14.0          | 42               |
+| 2016 | 19     | 17.0          | 51               |
+| 2020 | 21     | 19.0          | 57               |
+
+- ROW vs RANGE:
+    - ROWS: counts physical rows, regardless of their values
+    - RANGE: counts logical rows, based on the values in the ORDER BY clause. If multiple rows have the same value in the ORDER BY column, they are all included in the frame.
+
+        - RANGE treats duplicated values as a single entity, so if two rows have the same value in OVER's ORDER BY column, they are both included in the frame when using RANGE.
+        - Functions much the same as ROWS, but RANGE considers all rows with the same ORDER BY value as part of the frame.
+
+    // Generate sql examples to illustrate the difference between ROWS and RANGE, output the results in a markdown table. Explain the query and results in a few sentences after the table.
+``` sql
+WITH Sample_Data AS (
+  SELECT 1 AS ID, 10 AS Value UNION ALL
+  SELECT 2 AS ID, 20 AS Value UNION ALL
+  SELECT 3 AS ID, 20 AS Value UNION ALL
+  SELECT 4 AS ID, 30 AS Value UNION ALL
+  SELECT 5 AS ID, 40 AS Value
+)
+SELECT
+  ID,
+  Value,
+  SUM(Value) OVER (
+    ORDER BY Value
+    ROWS BETWEEN 1 PRECEDING AND CURRENT ROW
+  ) AS Sum_Rows,
+  SUM(Value) OVER (
+    ORDER BY Value
+    RANGE BETWEEN 1 PRECEDING AND CURRENT ROW
+  ) AS Sum_Range
+FROM Sample_Data
+ORDER BY ID;
+```
+| ID | Value | Sum_Rows | Sum_Range |
+|----|-------|----------|-----------|
+| 1  | 10    | 10       | 10        |
+| 2  | 20    | 30       | 30        |
+| 3  | 20    | 40       | 30        |
+| 4  | 30    | 50       | 50        |
+| 5  | 40    | 70       | 70        |
+
+### PIVOT
+Definition: Transforming rows into columns
+
+#### CROSS TAB
+
+``` sql
+-- Enable the tablefunc extension to use the crosstab function
+CREATE EXTENSION IF NOT EXISTS tablefunc;
+
+-- Create a cross tab query to show the number of medals won by each country in each year
+SELECT *
+FROM crosstab(
+  'SELECT Country, Year, COUNT(*) AS Medal_Count
+   FROM Summer_Medals
+   GROUP BY Country, Year
+   ORDER BY Country, Year',
+  'SELECT DISTINCT Year FROM Summer_Medals ORDER BY Year'
+) AS ct (
+  Country TEXT,
+  "1996" INT,
+  "2000" INT,
+  "2004" INT,
+  "2008" INT,
+  "2012" INT,
+  "2016" INT,
+  "2020" INT
+);
+```
+This query first enables the `tablefunc` extension, which provides the `crosstab` function. The main part of the query uses `crosstab` to pivot the data from the `Summer_Medals` table. The first argument to `crosstab` is a SQL query that selects the country, year, and count of medals, grouped by country and year. The second argument is a SQL query that selects distinct years to define the columns of the resulting table. The final part of the query defines the structure of the output table, specifying the country as a text column and each year as an integer column.
+
+| Country | 1996 | 2000 | 2004 | 2008 | 2012 | 2016 | 2020 |
+|---------|------|------|------|------|------|------|------|
+| AUS     | 41   | 58   | 50   | 46   | 35   | 29   | 46   |
+| BRA     | 15   | 12   | 10   | 15   | 17   | 19   | 21   |
+| CAN     | 22   | 28   | 26   | 18   | 18   | 22   | 24   |
+| CHN     | 16   | 28   | 32   | 48   | 38   | 26   | 38   |
+| CUB     | 25   | 29   | 27   | 24   | 14   | 11   | 7    |
+|
+
+
+```sql
+CREATE EXTENSION IF NOT EXISTS tablefunc;
+
+SELECT * FROM CROSSTAB($$
+  WITH Country_Awards AS (
+    SELECT
+      Country,
+      Year,
+      COUNT(*) AS Awards
+    FROM Summer_Medals
+    WHERE
+      Country IN ('FRA', 'GBR', 'GER')
+      AND Year IN (2004, 2008, 2012)
+      AND Medal = 'Gold'
+    GROUP BY Country, Year)
+
+  SELECT
+    Country,
+    Year,
+    RANK() OVER
+      (PARTITION BY Year
+       ORDER BY Awards DESC) :: INTEGER AS rank
+  FROM Country_Awards
+  ORDER BY Country ASC, Year ASC;
+-- Fill in the correct column names for the pivoted table
+$$) AS ct (Country VARCHAR,
+           "2004" INTEGER,
+           "2008" INTEGER,
+           "2012" INTEGER)
+
+Order by Country ASC;
+```
+This query first enables the `tablefunc` extension, which provides the `crosstab` function. The main part of the query uses `crosstab` to pivot the data from the `Summer_Medals` table. The first argument to `crosstab` is a SQL query that selects the country, year, and rank of gold medals won by France (FRA), Great Britain (GBR), and Germany (GER) in the years 2004, 2008, and 2012. The final part of the query defines the structure of the output table, specifying the country as a varchar column and each year as an integer column.
+
+| Country | 2004 | 2008 | 2012 |
+|---------|------|------|------|
+| FRA     | 2    | 3    | 3    |
+| GBR     | 3    | 2    | 1    |
+| GER     | 1    | 1    | 2    |
+
+#### ROLLUP and CUBE
+
+-`ROLLUP(column1, column2, ...)` : generates subtotals that roll up from the most detailed level to a grand total
+-`CUBE(column1, column2, ...)` : generates subtotals for all combinations of the specified columns
+
+``` sql
+SELECT
+  Country,
+  Year,
+  COUNT(*) AS Medals
+FROM Summer_Medals
+WHERE Country IN ('USA', 'CHN', 'RUS')
+GROUP BY ROLLUP(Country, Year)
+ORDER BY Country ASC NULLS LAST, Year ASC NULLS LAST;
+```
+This query retrieves the total number of medals won by the USA, China (CHN), and Russia (RUS) in each year, along with subtotals for each country and a grand total across all countries and years. The `ROLLUP` function is used in the `GROUP BY` clause to create these hierarchical totals. The results are ordered by country and year, with NULLs (representing subtotals and grand totals) appearing last.
+
+| Country | Year | Medals |
+|---------|------|--------|
+| CHN     | 1996 | 16     |
+| CHN     | 2000 | 28     |
+| CHN     | 2004 | 32     |
+| CHN     | 2008 | 48     |
+| CHN     | 2012 | 38     |
+| CHN     | 2016 | 26     |
+| CHN     | 2020 | 38     |
+| CHN     | NULL | 226    |
+| RUS     | 1996 | 26     |
+| RUS     | 2000 | 32     |
+| RUS     | 2004 | 27     |
+| RUS     | 2008 | 23     |
+| RUS     | 2012 | 24     |
+| RUS     | NULL | 132    |
+| USA     | 1996 | 101    |
+| USA     | 2000 | 97     |
+| USA     | 2004 | 101    |
+| USA     | 2008 | 110    |
+| USA     | 2012 | 104    |
+| USA     | 2016 | 121    |
+| USA     | 2020 | 113    |
+| USA     | NULL | 747    |
+
+
+
+
+
+The old way
+```sql
+-- First Query: Counts medals by type for each country
+SELECT
+  Country,
+  Medal,
+  COUNT(*) AS Awards
+FROM Summer_Medals
+WHERE
+  Year = 2008 AND Country IN ('CHN', 'RUS')
+GROUP BY Country, Medal
+ORDER BY Country ASC, Medal ASC
+
+UNION ALL
+
+-- Second Query: Counts the total medals for each country
+SELECT
+  Country,
+  'Total' AS Medal, -- Uses a string literal 'Total' for the Medal column
+  COUNT(*) AS Awards
+FROM Summer_Medals
+WHERE
+  Year = 2008 AND Country IN ('CHN', 'RUS')
+GROUP BY Country
+ORDER BY Country ASC;
+```
+- ROLL UP:
+    ROLLUP is used to create subtotals that roll up from the most detailed level to a grand total. It generates a result set that includes all the levels of aggregation specified in the GROUP BY clause, plus an additional row for each level of aggregation.
+
+```sql
+SELECT
+  Country,
+  Medal,
+  COUNT(*) AS Awards
+FROM Summer_Medals
+WHERE
+  Year = 2008 AND Country IN ('CHN', 'RUS')
+-- GROUP BY with ROLLUP creates subtotal rows automatically
+GROUP BY Country, ROLLUP(Medal)
+ORDER BY Country ASC, Medal ASC;
+```
+
+| Country | Medal  | Awards |
+|---------|--------|--------|
+| CHN     | Bronze | 20     |
+| CHN     | Gold   | 48     |
+| CHN     | Silver | 28     |
+| CHN     | NULL   | 96     |
+| RUS     | Bronze | 13     |
+| RUS     | Gold   | 23     |
+| RUS     | Silver | 21     |
+| RUS     | NULL   | 57     |
+- CUBE:
+    CUBE is used to create subtotals for all combinations of the specified columns. It generates a result set that includes all possible combinations of the grouping columns, plus an additional row for each combination.
+
+```sql
+SELECT
+  Country,
+  Medal,
+  COUNT(*) AS Awards
+FROM Summer_Medals
+WHERE
+  Year = 2008 AND Country IN ('CHN', 'RUS')
+GROUP BY Country, Medal
+WITH ROLLUP
+ORDER BY Country ASC, Medal ASC;
+```
+| Country | Medal  | Awards |
+|---------|--------|--------|
+| CHN     | Bronze | 20     |
+| CHN     | Gold   | 48     |
+| CHN     | Silver | 28     |
+| CHN     | NULL   | 96     |
+| RUS     | Bronze | 13     |
+| RUS     | Gold   | 23     |
+| RUS     | Silver | 21     |
+| RUS     | NULL   | 57     |
+
+
+// Generate sql examples to illustrate the difference between ROLLUP and CUBE, output the results in a markdown table. Explain the query and results in a few sentences after the table.
+```sql
+SELECT
+  Country,
+  Year,
+  COUNT(*) AS Medals
+FROM Summer_Medals
+WHERE Country IN ('USA', 'CHN', 'RUS')
+GROUP BY ROLLUP(Country, Year)
+ORDER BY Country ASC NULLS LAST, Year ASC NULLS LAST;
+```
+| Country | Year | Medals |
+|---------|------|--------|
+| CHN     | 1996 | 16     |
+| CHN     | 2000 | 28     |
+| CHN     | 2004 | 32     |
+| CHN     | 2008 | 48     |
+| CHN     | 2012 | 38     |
+| CHN     | 2016 | 26     |
+| CHN     | 2020 | 38     |
+| CHN     | NULL | 226    |
+| RUS     | 1996 | 26     |
+| RUS     | 2000 | 32     |
+| RUS     | 2004 | 27     |
+| RUS     | 2008 | 23     |
+| RUS     | 2012 | 24     |
+| RUS     | NULL | 132    |
+| USA     | 1996 | 101    |
+| USA     | 2000 | 97     |
+| USA     | 2004 | 101    |
+| USA     | 2008 | 110    |
+| USA     | 2012 | 104    |
+| USA     | 2016 | 121    |
+| USA     | 2020 | 113    |
+| USA     | NULL | 747    |
+This query uses the `ROLLUP` function to generate a hierarchical summary of medals won by the USA, China (CHN), and Russia (RUS) across different years. The result set includes the total medals for each country in each year, subtotals for each country, and a grand total across all countries and years. The NULL values in the Country and Year columns represent these subtotals and grand totals.
+
+```sql
+SELECT
+  Country,
+  Year,
+  COUNT(*) AS Medals
+FROM Summer_Medals
+WHERE Country IN ('USA', 'CHN', 'RUS')
+GROUP BY CUBE(Country, Year)
+ORDER BY Country ASC NULLS LAST, Year ASC NULLS LAST;
+```
+| Country | Year | Medals |
+|---------|------|--------|
+| CHN     | 1996 | 16     |
+| CHN     | 2000 | 28     |
+| CHN     | 2004 | 32     |
+| CHN     | 2008 | 48     |
+| CHN     | 2012 | 38     |
+| CHN     | 2016 | 26     |
+| CHN     | 2020 | 38     |
+| CHN     | NULL | 226    |
+| RUS     | 1996 | 26     |
+| RUS     | 2000 | 32     |
+| RUS     | 2004 | 27     |
+| RUS     | 2008 | 23     |
+| RUS     | 2012 | 24     |
+| RUS     | NULL | 132    |
+| USA     | 1996 | 101    |
+| USA     | 2000 | 97     |
+| USA     | 2004 | 101    |
+| USA     | 2008 | 110    |
+| USA     | 2012 | 104    |
+| USA     | 2016 | 121    |
+| USA     | 2020 | 113    |
+| USA     | NULL | 747    |
+This query uses the `CUBE` function to generate a comprehensive summary of medals won by the USA, China (CHN), and Russia (RUS) across different years. The result set includes the total medals for each country in each year, subtotals for each country, subtotals for each year, and a grand total across all countries and years. The NULL values in the Country and Year columns represent these subtotals and grand totals. Unlike `ROLLUP`, which creates a hierarchical summary, `CUBE` provides a more exhaustive set of combinations for the specified columns.
+
+
+![](images/rollup-cube.png)
+
+Use ROLLUP when you want a hierarchical summary that rolls up from detailed levels to a grand total. Use CUBE when you need a comprehensive summary that includes all possible combinations of the specified columns, providing a more exhaustive view of the data.
