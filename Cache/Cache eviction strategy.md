@@ -1,5 +1,6 @@
 # Cache Eviction Strategy Comparison
 
+
 | Strategy         | Best Use Case                       | Space Overhead       | Time Complexity       | Pros                                      | Cons                                      | Key Takeaway                              |
 |------------------|-------------------------------------|----------------------|-----------------------|------------------------------------------|------------------------------------------|------------------------------------------|
 | FIFO (First-In-First-Out) | - Sequential access patterns<br>- When age of entry matters<br>- Batch processing systems | Low<br>- Queue: O(n)<br>- Hash set for tracking | - Add: O(1)<br>- Remove: O(1)<br>- Access: O(1) | - Simple to implement<br>- Low overhead<br>- Predictable behavior<br>- Good scan-resistance | - No consideration for usage frequency<br>- Can evict commonly used items<br>- No adaptation to changing access patterns | Best for workloads with uniform access or where recency of data is more important than frequency |
@@ -54,14 +55,6 @@
 - **ARC:** Dynamically adapts to workloads but incurs higher complexity.
 - **Clock/Second Chance:** Lightweight LRU approximation, less precise but efficient.
 
-# Definitions & Terminology
-- **Cache:** Temporary storage to speed up data access.
-- **Hit/Miss:** Successful/failed retrieval from cache.
-- **TTL:** Time-to-live, expiration duration for cache entries.
-- **Cold/Warm Cache:** Initially empty vs. pre-warmed cache state.
-- **Eviction:** Removing items from cache when full.
-- **Recency vs Frequency:** Prioritizing recently used vs. often used items.
-
 # When to Use Which Strategy
 - **Read-heavy:** LRU, TinyLFU.
 - **Write-heavy:** FIFO.
@@ -71,29 +64,6 @@
 - **Expiring data:** Time-Based.
 - **Memory-constrained:** Size-Based.
 - **Business-critical:** Priority-Based.
-
-# Metrics & Evaluation
-- **Hit Ratio:** % of cache hits.
-- **Miss Penalty:** Delay on cache miss.
-- **Latency:** Retrieval time.
-- **Throughput:** Requests per unit time.
-- **Memory Overhead:** Extra space used.
-- **CPU Cost:** Processing overhead.
-
-# Complexity & Resource Table
-| Strategy         | Space Overhead       | Time Complexity       | Metadata Overhead     |
-|------------------|----------------------|-----------------------|-----------------------|
-| FIFO             | Low (Queue: O(n))    | O(1) all             | Hash set              |
-| LIFO             | Low (Stack: O(n))    | O(1) all             | Hash set              |
-| LRU              | Medium (Doubly list) | O(1) all             | HashMap, list         |
-| LFU              | High (Counters)      | O(log n) or O(1)     | Frequency counters    |
-| Random           | Very Low (Hash)      | O(1) all             | Hash set              |
-| Time-Based       | Medium (Timestamps)  | O(log n) add/remove  | Sorted index          |
-| Size-Based       | Variable (Size)      | O(log n) add/remove  | Sorted size index     |
-| Priority-Based   | Medium-High (Priority) | O(log n) add/remove | Sorted priority index |
-| TinyLFU          | Medium (Sketches)    | O(1) all             | Window, sketches      |
-| ARC              | High (Four lists)    | O(1) all             | Multiple lists        |
-| Clock            | Low (Bit per entry)  | O(1) all             | Circular buffer       |
 
 # Worked Examples
 - **LRU (Cache size 3):** [1, 2, 3, 2, 4] → Evict 1, cache [2, 3, 4].
@@ -146,18 +116,3 @@
 - **DB Buffer:** LRU for temporal locality.
 - **Session Store:** Time-Based for expiration.
 - **Auth Tokens:** Time-Based for compliance.
-
-# Migration & Rollout Considerations
-- **Carrying:** Test on subset of traffic.
-- **Metrics:** Hit ratio, latency drops.
-- **Fallback:** Revert to old strategy if issues.
-
-# Reference Implementations & Libraries
-- **Caffeine:** Java, modern LRU/LFU.
-- **Guava:** Java caching utilities.
-- **Redis:** Configurable eviction policies.
-
-# Glossary & Further Reading
-- **Papers:** LRU paper (1976), ARC (2003).
-- **Blogs:** HighScalability on caching.
-- **Books:** "Cache and Memory Hierarchy Design".
