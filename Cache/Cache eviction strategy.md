@@ -1,4 +1,14 @@
-# Cache Eviction Strategy Comparison
+## Definition
+A cache eviction strategy is a set of rules or algorithms used to determine which items should be removed from a cache when it reaches its capacity limit. The goal of these strategies is to optimize the performance of the cache by retaining the most useful data while evicting less useful data.
+
+- **Purpose**: Manage limited cache space by deciding which entries to evict when adding a new item would exceed capacity.
+- **Trigger**: When the cache is full (or near full) and a new item needs to be added.
+- **Mechanism**: Based on heuristics or algorithms that prioritize which data is least likely to be needed soon.
+- **Key Characteristic**: Eviction is driven by **space constraints**, not data correctness.
+
+The cache does not have a vast amount of space like a database. Also, in the case of stale data, we may need to remove them from the cache. So, cache eviction policies are important factors to consider while designing a cache.
+
+## Cache Eviction Strategy Comparison
 
 
 | Strategy         | Best Use Case                       | Space Overhead       | Time Complexity       | Pros                                      | Cons                                      | Key Takeaway                              |
