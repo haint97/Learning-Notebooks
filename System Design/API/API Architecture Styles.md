@@ -43,7 +43,30 @@ This comprehensive guide explores the fundamental API architecture styles that p
 
 ## HTTP Fundamentals
 
-HTTP (Hypertext Transfer Protocol) is the foundation of data communication on the web. It's a stateless, request-response protocol that enables client-server interactions.
+HTTP (Hypertext Transfer Protocol) is the foundation of data communication on the web. It's a stateless (A stateless protocol is one in which each request is considered independent of any other request. This makes it simple to implement.), request-response protocol that enables client-server interactions.
+
+### Evolution of HTTP
+
+| Version   | Release Year | Methods Supported                               | Support for Headers | Connection Nature                  | Transport Protocol | Content Types Supported                     | Caching Support                          | Key Features                                                                                                                                                                                                                              | Drawbacks                                                                                   |
+| :-------- | :----------- | :---------------------------------------------- | :------------------ | :--------------------------------- | :----------------- | :------------------------------------------ | :--------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------ |
+| HTTP/1.0  | 1996         | HEAD, GET, POST                                 | Yes                 | Terminates immediately after response | TCP                | Hypertext, hypermedia, scripts, stylesheets, media | If-Modified-Since                       | - HTTP headers: Introduced header fields for rich metadata<br>- Response status codes: Defined codes for success, errors, and redirection<br>- Conditional requests: Supported basic conditional requests like If-Modified-Since<br>- Encoding: Introduced content encoding support<br>- Multiple file types: Enabled transfer of scripts, stylesheets, and media beyond hypertext | - Non-persistent connections increase latency for multiple requests<br>- No mandatory Host header complicates virtual hosting<br>- Limited caching support restricted to If-Modified-Since |
+| HTTP/1.1  | 1997         | HEAD, GET, POST, PUT, DELETE, TRACE, OPTIONS    | Yes                 | Persistent                         | TCP                | Hypertext, hypermedia, scripts, stylesheets, media | Advanced headers (e.g., Cache-Control, ETag) | - Persistent connections: Enabled connection reuse for multiple requests and responses over a single TCP connection, reducing overhead and latency<br>- Pipelining: Allowed sending multiple requests without waiting for previous responses, improving perceived latency<br>- Mandatory Host header: Facilitated virtual hosting for multiple websites on a single server<br>- Upgrade header: Supported upgrading to new protocols like HTTP/2.0 or HTTPS<br>- Transfer-encoding: Provided mechanisms for proxy commands, though not always reliable<br>- Advanced cache headers: Introduced Cache-Control and ETag for improved cache revalidation<br>- Extended HTTP methods: Added PUT, DELETE, TRACE, and OPTIONS for broader functionality | - Head-of-line blocking in pipelining<br>- TCP connection overhead<br>- Complex proxy handling with transfer-encoding |
+| HTTP/2.0  | 2015         | HEAD, GET, POST, PUT, DELETE, TRACE, OPTIONS    | Yes                 | Persistent                         | TCP                | Hypertext, hypermedia, scripts, stylesheets, media | Advanced headers (e.g., Cache-Control, ETag) | - Backward compatibility: Maintained HTTP/1.1 headers, URLs, and semantics for seamless integration<br>- Multiplexing: Allowed multiple requests and responses to be sent and received asynchronously over a single TCP connection<br>- Prioritized responses: Enabled server-side prioritization, e.g., sending smaller images first<br>- Server push: Allowed servers to proactively send resources like stylesheets or scripts to clients, reducing round trips<br>- Header compression: Reduced overhead by compressing HTTP headers | - Head-of-line blocking at the TCP level<br>- TCP connection overhead<br>- Complexity in implementing server push effectively |
+| HTTP/3.0  | 2019         | HEAD, GET, POST, PUT, DELETE, TRACE, OPTIONS    | Yes                 | Persistent                         | QUIC (UDP)         | Hypertext, hypermedia, scripts, stylesheets, media | Advanced headers (e.g., Cache-Control, ETag) | - QUIC protocol: Switched from TCP to QUIC over UDP, providing stream-level reliability and congestion control<br>- TLS 1.3: Integrated TLS 1.3 at the transport layer for enhanced security<br>- Eliminates head-of-line blocking: Independent streams within QUIC prevent blocking issues seen in HTTP/1.1 and HTTP/2.0<br>- Improved performance: Achieved lower latency and higher reliability, with studies showing up to 3x faster performance than HTTP/1.1<br>- Multiplexing: Continued support for asynchronous request/response handling<br>- Header compression: Retained HTTP/2.0’s header compression for reduced overhead<br>- Server push: Maintained proactive resource delivery | - Requires UDP support<br>- Newer technology with less widespread adoption<br>- Potential firewall issues blocking UDP traffic |
+
+#### `Q & A`:
+
+- `1. One of the advantages of HTTP/2.0 is that it can send responses out of order. How can we determine which response corresponds to which request?`
+
+In HTTP/2.0, each request is marked with a unique identifier before sending it to the server. The responses coming back from the server include the identifier of the requests they belong to; therefore, a browser can quickly determine which response corresponds to which request.
+
+- `2. What is the difference between HTTP pipelining and multiplexing?`
+
+There’s a subtle difference between HTTP pipelining and multiplexing, that is, the order of arrival of responses.
+
+Pipelining: In pipelining, multiple HTTP requests over a single TCP connection can be made without waiting for the earlier request’s responses. The responses arrive in order.
+
+Multiplexing: On the other hand, in multiplexing, we can make multiple requests over the same TCP connection without waiting for the earlier requests’ responses. The responses arrive in any order.
 
 ### HTTP Request-Response Model
 
@@ -738,7 +761,6 @@ REST (Representational State Transfer) is an architectural style for designing n
 
 ### The Six REST Constraints
 
-Roy Fielding defined six architectural constraints that characterize REST:
 
 #### 1. Client-Server Architecture
 **Principle**: Separation of concerns between client and server
@@ -748,6 +770,8 @@ Roy Fielding defined six architectural constraints that characterize REST:
 - Scalability (add more clients or servers)
 - Portability (mobile, web, IoT clients use same API)
 
+**Drawbacks**:
+- Enormous user requests can overload the server, network disconnectivity may interrupt services.
 **Example**:
 ```mermaid
 graph LR
@@ -763,6 +787,9 @@ graph LR
 ```
 
 #### 2. Stateless
+**Definition**: This constraint refers to the fact that no session state is allowed on the server; it should be entirely kept on the client. Moreover, each request from the client should contain all the necessary information for the server to process the request.
+
+
 **Principle**: Server doesn't store client context between requests
 
 **Each request must contain**:
@@ -778,13 +805,15 @@ Accept: application/json
 ```
 
 **Benefits**:
-- **Scalability**: Any server can handle any request (no session affinity)
+- **Scalability**: Any server can handle any request (no session affinity).  Easier server recovery from partial failures, no user data loss.
 - **Reliability**: Server failures don't lose session state
-- **Visibility**: Each request is self-contained (easier debugging)
+- **Visibility**: Each request is self-contained (easier debugging). Easier for monitoring systems to determine the request's purpose as all info is in one request.
+- **Scalability**: Resources are freed immediately after processing, allowing the server to handle more requests.
 
 **Trade-offs**:
 - **Increased payload**: Tokens sent with every request
 - **Complexity**: Client must manage state (tokens, refresh logic)
+- **Visibility**: May reduce network performance by sending repetitive data in successive requests.
 
 **Common Solutions**:
 - **JWT (JSON Web Tokens)**: Self-contained auth tokens
@@ -803,8 +832,24 @@ Cookie: session=abc123  ← Server stores session state
 ```
 
 #### 3. Cacheable
+
+**Definition**: An intermediate component between client and server that stores responses to earlier requests. These cached responses are reused for identical requests, reducing the need to hit the server.
 **Principle**: Responses must define if they can be cached
 
+**Benefits**:
+- **Performance**:  Reduces latency by storing data on the client side, improves network efficiency and user-perceived performance.
+- **Cost**: Lower bandwidth usage
+- **Scalability**: CDNs can cache responses
+
+**Drawbacks**:
+- Can reduce reliability and consistency if stale cached data differs significantly from current server data.
+
+
+**Best Practices**:
+- Use `ETag` for dynamic content
+- Set appropriate `max-age` based on update frequency
+- Use `private` for user-specific data
+- Implement cache invalidation strategy
 **Cache-Control Directives**:
 ```http
 Cache-Control: public, max-age=3600
@@ -838,18 +883,10 @@ sequenceDiagram
     Server-->>Client: 304 Not Modified
 ```
 
-**Benefits**:
-- **Performance**: Reduced latency and server load
-- **Cost**: Lower bandwidth usage
-- **Scalability**: CDNs can cache responses
-
-**Best Practices**:
-- Use `ETag` for dynamic content
-- Set appropriate `max-age` based on update frequency
-- Use `private` for user-specific data
-- Implement cache invalidation strategy
 
 #### 4. Uniform Interface
+**Definition**: All system components interact via a standardized, uniform interface. This simplifies overall system design, enhances visibility of component interaction, and decouples services from their implementations, fostering independent development.
+
 **Principle**: Standardized way to interact with resources
 
 **Four Sub-constraints**:

@@ -261,9 +261,14 @@ Back-of-envelope calculations help API designers establish realistic Service Lev
 - What infrastructure resources are needed to meet SLA targets?
 
 ### Core Metrics and Formulas
+#### 0. Latency
+Is the propagation time of a message (request and response) between the client and server, excluding the processing time.
 
-#### 1. Response Time (Latency)
-Response time is the total duration from when a client sends a request to when it receives the complete response.
+
+#### 1. Response Time
+ Is the time an API takes to respond to a request. It includes both network latency and processing time. It begins as the request starts and ends when the client receives the response. Although some references may use latency and response times interchangeably, they measure two entirely different time frames.
+
+
 
 **Formula:**
 ```
@@ -284,6 +289,11 @@ Response Transmission Time: 50 ms
 Total_Response_Time = 100 + 200 + 50 = 350 ms
 ```
 
+![](api-images/latency-response.png)
+
+
+**Factors affecting response time:**
+![](api-images/factor-impact-resonse-time.png)
 #### 2. Server Processing Time
 The duration the server takes to handle a request internally.
 
