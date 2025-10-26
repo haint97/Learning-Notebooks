@@ -54,6 +54,120 @@ HTTP (Hypertext Transfer Protocol) is the foundation of data communication on th
 | HTTP/2.0  | 2015         | HEAD, GET, POST, PUT, DELETE, TRACE, OPTIONS    | Yes                 | Persistent                         | TCP                | Hypertext, hypermedia, scripts, stylesheets, media | Advanced headers (e.g., Cache-Control, ETag) | - Backward compatibility: Maintained HTTP/1.1 headers, URLs, and semantics for seamless integration<br>- Multiplexing: Allowed multiple requests and responses to be sent and received asynchronously over a single TCP connection<br>- Prioritized responses: Enabled server-side prioritization, e.g., sending smaller images first<br>- Server push: Allowed servers to proactively send resources like stylesheets or scripts to clients, reducing round trips<br>- Header compression: Reduced overhead by compressing HTTP headers | - Head-of-line blocking at the TCP level<br>- TCP connection overhead<br>- Complexity in implementing server push effectively |
 | HTTP/3.0  | 2019         | HEAD, GET, POST, PUT, DELETE, TRACE, OPTIONS    | Yes                 | Persistent                         | QUIC (UDP)         | Hypertext, hypermedia, scripts, stylesheets, media | Advanced headers (e.g., Cache-Control, ETag) | - QUIC protocol: Switched from TCP to QUIC over UDP, providing stream-level reliability and congestion control<br>- TLS 1.3: Integrated TLS 1.3 at the transport layer for enhanced security<br>- Eliminates head-of-line blocking: Independent streams within QUIC prevent blocking issues seen in HTTP/1.1 and HTTP/2.0<br>- Improved performance: Achieved lower latency and higher reliability, with studies showing up to 3x faster performance than HTTP/1.1<br>- Multiplexing: Continued support for asynchronous request/response handling<br>- Header compression: Retained HTTP/2.0’s header compression for reduced overhead<br>- Server push: Maintained proactive resource delivery | - Requires UDP support<br>- Newer technology with less widespread adoption<br>- Potential firewall issues blocking UDP traffic |
 
+### Chunk and frame
+
+| Feature                   | **HTTP/1.1 – Chunk**                                                                                | **HTTP/2 – Frame**                                                                                    | **HTTP/3 – QUIC Frame**                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Purpose**               | Stream body without knowing total length.                                                           | Binary framing for multiplexing and control.                                                          | Binary framing for multiplexing and control over QUIC (UDP).                                              |
+| **Layer**                 | Application-level (part of HTTP body).                                                              | Binary framing layer (on top of TCP).                                                                 | Binary framing layer (on top of QUIC).                                                                    |
+| **Encoding**              | Text-based headers and chunk markers (ASCII).                                                       | Binary-encoded frames.                                                                                | Binary-encoded frames.                                                                                    |
+| **Carries**               | Only message body (data).                                                                           | Headers, data, settings, priority, etc.                                                               | Headers, data, settings, priority, etc.                                                                   |
+| **Multiplexing**          | ❌ None — one request per TCP connection.                                                            | ✅ Yes — multiple logical streams on one TCP connection.                                               | ✅ Yes — multiple streams over QUIC (UDP).                                                                 |
+| **Head-of-Line Blocking** | ✅ Yes — if one request blocks, all wait.                                                            | ✅ Yes — still at TCP layer.                                                                           | ❌ No — QUIC isolates streams at the transport level.                                                      |
+| **Compression**           | Optional body compression (gzip, deflate).                                                          | HPACK header compression.                                                                             | QPACK (QUIC-safe header compression).                                                                     |
+| **Reliability**           | TCP guarantees order and delivery.                                                                  | TCP guarantees order and delivery.                                                                    | QUIC ensures reliability but avoids TCP head-of-line blocking.                                            |
+| **Flow Control**          | Basic per-connection flow control.                                                                  | Per-stream and per-connection flow control.                                                           | Independent per-stream flow control.                                                                      |
+| **Latency**               | Higher (TCP handshake + sequential).                                                                | Lower (multiplexing).                                                                                 | Lowest (QUIC: 0-RTT, no TCP handshake).                                                                   |
+| **Binary File Upload**    | ✅ Supported (binary data inside text-based chunks).                                                 | ✅ Supported (binary-safe frames).                                                                     | ✅ Supported (binary-safe frames).                                                                         |
+| **Transport Protocol**    | TCP                                                                                                 | TCP                                                                                                   | QUIC (built on UDP).                                                                                      |
+| **Analogy**               | 🚚 **One truck carrying one big box** — chunks just split it into pieces, but it’s still one route. | 🚚 **One truck carrying many labelled boxes** — frames from different streams interleave efficiently. | 🚀 **Many trucks driving in parallel on faster roads** — QUIC streams run independently without blocking. ||
+
+
+| Layer                     | **HTTP/1.1**               | **HTTP/2**              | **HTTP/3 (QUIC)**                |
+| ------------------------- | -------------------------- | ----------------------- | -------------------------------- |
+| **Framing Type**          | Chunked (text-based)       | Binary frame            | Binary QUIC frame                |
+| **Transport**             | TCP                        | TCP                     | QUIC (UDP-based)                 |
+| **Multiplexing**          | ❌ No                       | ✅ Yes                   | ✅ Yes                            |
+| **Head-of-Line Blocking** | ✅ Yes                      | ✅ Yes (TCP-level)       | ❌ No                             |
+| **Header Compression**    | ❌ None                     | ✅ HPACK                 | ✅ QPACK                          |
+| **Setup Time**            | 1–2 RTT (TCP + TLS)        | 1–2 RTT                 | ⚡ 0-RTT (QUIC handshake)         |
+| **File Upload (Binary)**  | ✅ Supported via chunks     | ✅ Supported             | ✅ Supported                      |
+| **Best For**              | Simplicity & compatibility | Faster content delivery | Low-latency, mobile-friendly web |
+
+#### Example
+
+```
+═══════════════════════════════════════════════════════════════
+        HTTP/1.1 — Chunked Transfer Encoding (Text-based)
+═══════════════════════════════════════════════════════════════
+Client                                           Server
+│                                                  │
+│  Request:                                        │
+│  ┌──────────────────────────────┐                │
+│  │ POST /upload HTTP/1.1        │                │
+│  │ Transfer-Encoding: chunked   │                │
+│  └──────────────────────────────┘                │
+│                                                  │
+│  Response Body (chunks sent sequentially):       │
+│   ┌──────────┐                                   │
+│   │4\r\nWiki │──► Chunk 1 (4 bytes)              │
+│   │5\r\npedia│──► Chunk 2 (5 bytes)              │
+│   │0\r\n     │──► End of chunks                  │
+│   └──────────┘                                   │
+│                                                  │
+│  ➤ Chunks are *text-based* metadata (size) but carry
+│    *binary-safe* data (e.g., images, files, etc.)
+│  ➤ Only ONE stream per TCP connection.
+│  ➤ Packet loss or slow response blocks everything.
+│
+│  ❌ Head-of-line blocking
+│  ❌ No multiplexing
+│  ✅ Simplicity, wide compatibility
+▼
+═══════════════════════════════════════════════════════════════
+        HTTP/2 — Binary Framing Layer (Multiplexed over TCP)
+═══════════════════════════════════════════════════════════════
+Client                                           Server
+│                                                  │
+│  ┌───────────── Control Connection (TCP) ─────────────┐
+│  │                                                   │
+│  │ Stream 1: [HEADERS][DATA][DATA][END_STREAM]       │
+│  │ Stream 2:     [HEADERS][DATA][END_STREAM]         │
+│  │ Stream 3:         [HEADERS][DATA][END_STREAM]     │
+│  │──────────────────────────────────────────────────►│
+│  └───────────────────────────────────────────────────┘
+│
+│  ➤ All streams share ONE TCP connection.
+│  ➤ Frames are binary and interleaved:
+│       • HEADERS frames carry metadata (compressed via HPACK)
+│       • DATA frames carry actual payloads (text or binary)
+│  ➤ If one TCP packet is lost → ALL streams wait (TCP reordering).
+│
+│  ✅ Multiplexing (logical concurrency)
+│  ✅ Header compression (HPACK)
+│  ⚠️ Still has TCP head-of-line blocking
+│  ⚙️ Improved efficiency but limited by TCP semantics
+▼
+═══════════════════════════════════════════════════════════════
+        HTTP/3 — QUIC Frames (Multiplexed over UDP)
+═══════════════════════════════════════════════════════════════
+Client                                           Server
+│                                                  │
+│  ┌────────────── QUIC Connection (UDP) ───────────────┐
+│  │                                                    │
+│  │ Stream 1: [Frame1][Frame2][Frame3]                 │
+│  │ Stream 2: [Frame1][Frame2]                         │
+│  │ Stream 3: [Frame1]                                 │
+│  │───────────────────────────────────────────────────►│
+│  └────────────────────────────────────────────────────┘
+│
+│  ➤ QUIC = UDP + built-in reliability, flow control, and encryption.
+│  ➤ Streams are independent:
+│       • Lost packet in Stream 1 does NOT block Streams 2 or 3.
+│  ➤ Faster connection setup (0-RTT resumption, no TCP handshake).
+│  ➤ Uses QPACK (QUIC-friendly header compression).
+│
+│  ✅ Multiplexing (true concurrency)
+│  ✅ No head-of-line blocking
+│  ✅ Built-in TLS 1.3 security
+│  ✅ Better loss recovery, lower latency
+│  🚀 Designed for real-time web (HTTP/3)
+▼
+═══════════════════════════════════════════════════════════════
+
+```
+
+
 #### `Q & A`:
 
 - `1. One of the advantages of HTTP/2.0 is that it can send responses out of order. How can we determine which response corresponds to which request?`
