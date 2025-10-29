@@ -4,6 +4,8 @@
 
 If the response you're generating is too long and risks being cut off or exceeding length limits, **automatically split the response into multiple clearly numbered parts** (e.g., "Part 1 of 3", "Part 2 of 3", etc.).
 
+Use c# instead of default python
+
 **After each part:**
 - Stop and wait for explicit acknowledgment from the user (e.g., the user replies with "next") before continuing.
 - Do **not** continue to the next part unless the user confirms.
