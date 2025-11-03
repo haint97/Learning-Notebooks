@@ -4,8 +4,6 @@
 
 If the response you're generating is too long and risks being cut off or exceeding length limits, **automatically split the response into multiple clearly numbered parts** (e.g., "Part 1 of 3", "Part 2 of 3", etc.).
 
-Use c# instead of default python
-
 **After each part:**
 - Stop and wait for explicit acknowledgment from the user (e.g., the user replies with "next") before continuing.
 - Do **not** continue to the next part unless the user confirms.
@@ -20,3 +18,6 @@ Use c# instead of default python
 - Keep responses clear and concise where possible.
 - Prefer readable, maintainable code over overly clever implementations.
 - When showing examples, use the project's existing style and structure where applicable.
+
+## Default programming language
+**Use C# as the default programming language** for all code examples, demonsrtation, and programming-related responses unless otherwise specified by the user.
