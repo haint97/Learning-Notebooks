@@ -160,6 +160,7 @@ As applications scale, handling state transitions inefficiently can lead to issu
 ### State transition
 State transitions occur when the application state changes due to user interactions, API responses, or other events. Efficiently managing these transitions is crucial for maintaining a responsive UI.
 
+
 #### Types of State
 - **Local State**: Data specific to individual components (toggles, form inputs). Encapsulates behavior within the component, ideal for unshared state.
 - **Global State**: Data shared across multiple components (user authentication, theme settings). Requires a centralized store for consistency.
@@ -183,12 +184,78 @@ State transitions occur when the application state changes due to user interacti
 | Managing stateful interactions and transitions | • Utilize finite state machines (FSM).<br>• Apply event sourcing.<br>• Use structured state modeling. |
 | Complexity and maintainability issues | • Adopt modular architectures.<br>• Use state management libraries (Redux, Zustand).<br>• Leverage microservices for scalability. |
 
+#### Advanced State Management Techniques
+- **Immutable State**: Using immutable data structures to prevent unintended side effects and make state changes predictable.
+- **State Normalization**: Structuring state to avoid redundancy and improve efficiency, especially in large applications.
+- **Selectors and Memoization**: Using selectors to derive computed state and memoization to optimize performance by caching results of expensive computations.
+- **Middleware**: Implementing middleware to handle side effects, logging, and asynchronous actions in state management.
+- **Keep state minimal**: Only store essential data in the state to reduce complexity and improve performance.
+- **Use derived state**: Compute values on-the-fly instead of storing them, reducing redundancy and potential inconsistencies.
+- **Manage async explicitly**: Represent all async states clearly, such as loading, success, and error, to improve predictability and user feedback.
+
+
+| Strategy | Why It Matters | How It Helps |
+| :--- | :--- | :--- |
+| Modular state slices | Isolates feature-specific state. | Keeps codebase maintainable and scalable. |
+| Async state handling (e.g., with React Query) | Deals with API latency, caching, and retries. | Reduces boilerplate and improves UX. |
+| Memoized selectors (`reselect`) | Avoids recalculations and re-renders. | Boosts performance in large apps. |
+| Persisted state | Retains user preferences or carts. | Enhances continuity between sessions. |
+| Event-driven updates | Decouples features in large systems. | Keeps communication flexible and testable. |
 
 
 
+# Performance and Optimization
+## Key Network performance metrics
+- **Latency**: The time it takes for a data packet to travel from the client to the server and back.
+- **Throughput**: The amount of data that can be transmitted over a network in a given amount of time.
+- **Bandwidth**: The maximum rate of data transfer across a network path.
+- **Time to First Byte (TTFB)**: The time it takes for the browser to receive the first byte of data from the server.
+- **Page Load Time**: The total time it takes for a web page to fully load
+![alt text](images/network-performance-waterfall.png)
+
+## HTTP optimization techniques
+
+- **Minimize HTTP Requests**: Reduce the number of requests by combining files, using CSS sprites, and inlining small assets.
+- **Use Content Delivery Networks (CDNs)**: Distribute content across multiple servers to reduce latency and improve load times.
+- **Enable Compression**: Use Gzip or Brotli compression to reduce the size of transferred files.
+- **Leverage Browser Caching**: Set appropriate cache headers to allow browsers to cache static assets.
+- **Optimize Images**: Use appropriate formats, compress images, and implement lazy loading.
+- **Use HTTP/2 or HTTP/3**: Take advantage  of multiplexing and improved performance features of newer HTTP versions.
+- **Implement Lazy Loading**: Load resources only when they are needed to reduce initial load times
+- **Connection Keep-Alive**: Maintain persistent connections to reduce the overhead of establishing new connections for each request.
+
+## Caching strategies for faster load times
+- **Browser Caching**: Utilize HTTP headers like Cache-Control and ETag to enable browsers to cache static resources.
+- **Service Workers**: Implement service workers to cache assets and API responses for offline access and
+- **Network caching techniques**: Use CDNs and reverse proxies to cache content closer to users. reduce server load.
+- **Application-level caching**: Cache frequently accessed data in memory or local storage to reduce redundant network requests.
+- **Data caching**: Cache API responses and database queries to minimize latency and improve performance.
 
 
+## Optimizing Media Rendering for Faster Frontends
+
+| Optimization Technique | Description | Performance Impact |
+| :--- | :--- | :--- |
+| **Choosing the right format** | Use efficient image formats like WebP, AVIF, and SVG to reduce file size while maintaining quality. For videos, opt for modern codecs like VP9 or AV1 for superior compression. | Reduces file size without sacrificing quality, leading to faster load times. |
+| **Responsive and lazy loading** | Use `srcset` to serve the most suitable image resolution for different screen sizes. Apply lazy loading (`loading="lazy"`) to defer offscreen media until needed. | Optimizes bandwidth usage and reduces initial page load times, improving first contentful paint (FCP). |
+| **Image and video compression** | Apply lossy or lossless compression techniques to minimize file sizes without noticeable quality loss. | Minimizes data transfer, crucial for large media-heavy sites, resulting in faster rendering. |
+| **Smart streaming with adaptive protocols** | Use HLS (HTTP Live Streaming) and DASH (Dynamic Adaptive Streaming over HTTP) to deliver videos in chunks based on network conditions. | Prevents buffering, optimizes playback across devices, and improves user experience. |
+| **Efficient video loading (Lazy and preloading)** | Set a poster image (`poster="preview.jpg"`) to provide a preview before playback, and control preload behavior (`preload="none"` or `"metadata"`). | Reduces unnecessary video loads, improving page responsiveness and reducing data usage. |
+| **Accelerating delivery with CDNs** | Distribute optimized images and videos via CDNs to cache content closer to users and reduce server load. | Improves global load times, reduces network congestion, and ensures consistent performance. |
+| **Continuous monitoring and performance analysis** | Use Lighthouse, PageSpeed Insights, and Chrome DevTools to measure improvements and adjust optimizations accordingly. | Helps refine strategies over time, ensuring sustained performance gains. |
 
 # Q & A:
 1. `Why does the browser create both a DOM and a CSSOM instead of combining them from the start?`
 The DOM and CSSOM serve different purposes—while the DOM structures a page’s content, the CSSOM defines its styling. Keeping them separate allows the browser to update styles without re-parsing the entire HTML document, improving efficiency. They are merged later in the rendering process to create the render tree, which ensures only visible elements are considered for layout and painting.
+
+2. `How does caching impact the performance of dynamic content, and what are the trade-offs?`
+Caching can significantly improve the performance of dynamic content by reducing server load and decreasing latency for frequently accessed data. However, the trade-offs include the risk of serving stale data if the cache is not properly invalidated or updated. Additionally, caching dynamic content may require more complex strategies to ensure that users receive the most up-to-date information while still benefiting from caching efficiencies.
+3. `What are some common pitfalls when implementing state management in large-scale front-end applications?`
+Common pitfalls include overcomplicating the state structure, leading to difficulty in maintenance and debugging. Other issues include inefficient state updates causing performance bottlenecks, lack of clear separation between local and global state, and inadequate handling of asynchronous operations. Additionally, failing to document state transitions and dependencies can lead to confusion among team members.
+4. `How can developers effectively measure and monitor front-end performance in real-time?`
+Developers can use tools like Google Lighthouse, WebPageTest, and browser developer tools to measure key performance metrics such as load time, FCP, LCP, FID, and CLS. Implementing real-time monitoring solutions like New Relic, Datadog, or custom analytics can help track performance over time, identify bottlenecks, and gather user experience data. Additionally, setting up performance budgets and alerts can help maintain optimal performance levels.
+
+5. `What is the difference between browser caching and CDN caching?`
+Browser caching improves performance by storing static assets like images, CSS, and JavaScript on a user’s device. This reduces repeated network requests and speeds up page loads for returning visitors. It is managed through HTTP headers like Cache-Control and ETag and is especially effective for repeat access on the same device.
+
+On the other hand, CDN caching stores resources on globally distributed edge servers, allowing users to retrieve content from a location closer to them. This reduces latency for all users, not just repeat visitors, and significantly offloads traffic from the origin server. CDNs also support more advanced caching strategies and better handling of dynamic content.

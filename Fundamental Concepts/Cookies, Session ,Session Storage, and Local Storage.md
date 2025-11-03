@@ -20,6 +20,9 @@
 
 Web applications require various storage mechanisms to maintain state, store user preferences, and cache data. The four primary storage options—Cookies, Sessions, Session Storage, and Local Storage—each serve distinct purposes with unique characteristics, limitations, and security implications.
 
+A typical HTTP request-response cycle is stateless, meaning the server treats each incoming request as independent and unrelated to previous ones. This stateless nature allows the server to handle large requests efficiently, improving scalability. However, many real-world applications require the server to remember user interactions, making state management essential.
+
+
 **Important Distinction:**
 - **Cookies** and **Sessions** work together for server-side state management
 - **Session Storage** and **Local Storage** are client-side Web Storage APIs
@@ -31,7 +34,61 @@ This document provides a comprehensive guide to understanding and implementing t
 ## Cookies
 
 ### Definition
-Cookies are small text files (typically 4KB maximum) stored on the user's device by web browsers. They are sent back and forth between the client and server with every HTTP request.
+Cookies are small text files (typically 4KB maximum) stored on the user's device by web browsers. They are sent back and forth between the client and server with every HTTP request.The data stored in the cookies is labeled with a unique ID. They are sent to the server with each request and can be used for various purposes, including:
+- Session management:Cookies can be used for session management. By exchanging cookies, the website recognizes users and their preferences, such as whether a specific user likes to see news related to sports or politics.
+- Personalization: Cookies can store user preferences, such as language settings or theme choices, to enhance the user experience.
+- Tracking: Cookies can track user behavior across sessions and websites for analytics and advertising purposes.
+
+### How Cookies Work
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    COOKIE FLOW DIAGRAM                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Server sets cookie                                    │
+│     │                                                       │
+│     ├─→ Server sends Set-Cookie header                   │
+│     │   └─→ Cookie stored in browser                     │
+│     │                                                       │
+│     └─→ Client acknowledges cookie storage               │
+│                                                             │
+│  2. Subsequent requests                                   │
+│     │                                                       │
+│     ├─→ Browser sends Cookie header                      │
+│     │                                                       │
+│     ├─→ Server reads cookie data                         │
+│     │                                                       │
+│     └─→ Server processes request with cookie context    │
+│                                                             │
+│  3. Cookie expiration / deletion                          │
+│     │                                                       │
+│     └─→ Browser deletes cookie based on expiry or user   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Types of Cookies
+1. **Session Cookies**
+   - Temporary cookies that are deleted when the browser is closed
+   - Used for session management (e.g., login sessions)
+2. **Persistent Cookies**
+   - Remain on the user's device until they expire or are deleted
+   - Used for remembering user preferences and login states
+3. **Secure Cookies**
+   - Transmitted only over HTTPS connections
+   - Used to enhance security for sensitive data
+4. **Zombie Cookies**
+   - Cookies that are recreated after deletion
+   - Used for persistent tracking
+
+
+### Q&A
+`Can the client tamper with the cookie’s attributes?`
+Yes, the client can tamper with cookie attributes such as value, expiration date, and path using browser developer tools or JavaScript (unless the HttpOnly flag is set). However, secure attributes like Secure and HttpOnly can help mitigate some risks associated with tampering. Servers often use measures to catch such tampering by including secure hashes of the cookie’s data. As a result, the client cannot change the cookie data and the hash value. When presented with such a cookie to a server, a hash of the new data won’t match the one stored as part of the cookie, and the server will reject the cookie.
+`What happens if a cookie is stolen?`
+If a cookie is stolen, an attacker can potentially impersonate the user associated with that cookie, gaining unauthorized access to their session and sensitive information. This is particularly dangerous for session cookies used for authentication. To mitigate this risk, developers should implement security measures such as using the Secure and HttpOnly flags, employing SameSite attributes, and implementing proper session management practices on the server side.
+
 
 ### Technical Characteristics
 
