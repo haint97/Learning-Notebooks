@@ -387,116 +387,115 @@ public class TreeRecursionSolutions
 ```
 
 4. Binary Tree Diameter
-````csharp
-
-public class TreeNode
-{
-    public int val;
-    public TreeNode left;
-    public TreeNode right;
-    public TreeNode(int val = 0, TreeNode left = null, TreeNode right = null)
+```csharp
+    public class TreeNode
     {
-        this.val = val;
-        this.left = left;
-        this.right = right;
+        public int val;
+        public TreeNode left;
+        public TreeNode right;
+        public TreeNode(int val = 0, TreeNode left = null, TreeNode right = null)
+        {
+            this.val = val;
+            this.left = left;
+            this.right = right;
+        }
     }
-}
-
-// Solution 2a: Naive Approach - O(n^2)
-public static int DiameterOfBinaryTree(TreeNode root)
+public class TreeRecursionSolutions
 {
-    if (root == null) return 0;
-
-    // Three possibilities for diameter:
-    // 1. Diameter is in left subtree
-    int leftDiameter = DiameterOfBinaryTree(root.left);
-
-    // 2. Diameter is in right subtree
-    int rightDiameter = DiameterOfBinaryTree(root.right);
-
-    // 3. Diameter passes through root (left_height + right_height)
-    int heightThroughRoot = GetHeight(root.left) + GetHeight(root.right);
-
-    return Math.Max(Math.Max(leftDiameter, rightDiameter), heightThroughRoot);
-}
-
-private static int GetHeight(TreeNode node)
-{
-    if (node == null) return 0;
-    return 1 + Math.Max(GetHeight(node.left), GetHeight(node.right));
-}
-
-// Solution 2b: Optimized Approach - O(n)
-private static int maxDiameter = 0;
-
-public static int DiameterOptimized(TreeNode root)
-{
-    maxDiameter = 0;
-    GetHeightAndUpdateDiameter(root);
-    return maxDiameter;
-}
-
-private static int GetHeightAndUpdateDiameter(TreeNode node)
-{
-    if (node == null) return 0;
-
-    // Get heights of left and right subtrees
-    int leftHeight = GetHeightAndUpdateDiameter(node.left);
-    int rightHeight = GetHeightAndUpdateDiameter(node.right);
-
-    // Update global diameter if path through current node is longer
-    int currentDiameter = leftHeight + rightHeight;
-    maxDiameter = Math.Max(maxDiameter, currentDiameter);
-
-    // Return height of current subtree
-    return 1 + Math.Max(leftHeight, rightHeight);
-}
-
-// Enhanced version with detailed tracing
-public static int DiameterWithTrace(TreeNode root)
-{
-    maxDiameter = 0;
-    Console.WriteLine("=== COMPUTING TREE DIAMETER ===");
-    int height = GetHeightWithTrace(root, 0);
-    Console.WriteLine($"Final diameter: {maxDiameter}");
-    return maxDiameter;
-}
-
-private static int GetHeightWithTrace(TreeNode node, int depth)
-{
-    string indent = new string(' ', depth * 2);
-
-    if (node == null)
+    // Solution 2a: Naive Approach - O(n^2)
+    public static int DiameterOfBinaryTree(TreeNode root)
     {
-        Console.WriteLine($"{indent}→ null node: height = 0");
-        return 0;
+        if (root == null) return 0;
+
+        // Three possibilities for diameter:
+        // 1. Diameter is in left subtree
+        int leftDiameter = DiameterOfBinaryTree(root.left);
+
+        // 2. Diameter is in right subtree
+        int rightDiameter = DiameterOfBinaryTree(root.right);
+
+        // 3. Diameter passes through root (left_height + right_height)
+        int heightThroughRoot = GetHeight(root.left) + GetHeight(root.right);
+
+        return Math.Max(Math.Max(leftDiameter, rightDiameter), heightThroughRoot);
     }
 
-    Console.WriteLine($"{indent}→ Node {node.val}");
+    private static int GetHeight(TreeNode node)
+    {
+        if (node == null) return 0;
+        return 1 + Math.Max(GetHeight(node.left), GetHeight(node.right));
+    }
 
-    int leftHeight = GetHeightWithTrace(node.left, depth + 1);
-    int rightHeight = GetHeightWithTrace(node.right, depth + 1);
+    // Solution 2b: Optimized Approach - O(n)
+    private static int maxDiameter = 0;
 
-    int currentDiameter = leftHeight + rightHeight;
-    int oldMaxDiameter = maxDiameter;
-    maxDiameter = Math.Max(maxDiameter, currentDiameter);
+    public static int DiameterOptimized(TreeNode root)
+    {
+        maxDiameter = 0;
+        GetHeightAndUpdateDiameter(root);
+        return maxDiameter;
+    }
 
-    int height = 1 + Math.Max(leftHeight, rightHeight);
+    private static int GetHeightAndUpdateDiameter(TreeNode node)
+    {
+        if (node == null) return 0;
 
-    Console.WriteLine($"{indent}← Node {node.val}: height={height}, diameter_through_node={currentDiameter}");
-    if (maxDiameter > oldMaxDiameter)
-        Console.WriteLine($"{indent}  ★ New max diameter: {maxDiameter}");
+        // Get heights of left and right subtrees
+        int leftHeight = GetHeightAndUpdateDiameter(node.left);
+        int rightHeight = GetHeightAndUpdateDiameter(node.right);
 
-    return height;
+        // Update global diameter if path through current node is longer
+        int currentDiameter = leftHeight + rightHeight;
+        maxDiameter = Math.Max(maxDiameter, currentDiameter);
+
+        // Return height of current subtree
+        return 1 + Math.Max(leftHeight, rightHeight);
+    }
+
+    // Enhanced version with detailed tracing
+    public static int DiameterWithTrace(TreeNode root)
+    {
+        maxDiameter = 0;
+        Console.WriteLine("=== COMPUTING TREE DIAMETER ===");
+        int height = GetHeightWithTrace(root, 0);
+        Console.WriteLine($"Final diameter: {maxDiameter}");
+        return maxDiameter;
+    }
+
+    private static int GetHeightWithTrace(TreeNode node, int depth)
+    {
+        string indent = new string(' ', depth * 2);
+
+        if (node == null)
+        {
+            Console.WriteLine($"{indent}→ null node: height = 0");
+            return 0;
+        }
+
+        Console.WriteLine($"{indent}→ Node {node.val}");
+
+        int leftHeight = GetHeightWithTrace(node.left, depth + 1);
+        int rightHeight = GetHeightWithTrace(node.right, depth + 1);
+
+        int currentDiameter = leftHeight + rightHeight;
+        int oldMaxDiameter = maxDiameter;
+        maxDiameter = Math.Max(maxDiameter, currentDiameter);
+
+        int height = 1 + Math.Max(leftHeight, rightHeight);
+
+        Console.WriteLine($"{indent}← Node {node.val}: height={height}, diameter_through_node={currentDiameter}");
+        if (maxDiameter > oldMaxDiameter)
+            Console.WriteLine($"{indent}  ★ New max diameter: {maxDiameter}");
+
+        return height;
+    }
 }
-
 ```
 
 
 5. Generate All Binary Strings
-```csharp
-// ...existing code...
 
+```csharp
 public class TreeRecursionSolutions
 {
     // Solution 3: Binary Strings with No Consecutive 1's - Tree Recursion with Constraints
@@ -722,6 +721,9 @@ public class IndirectRecursion
         }
     }
 }
+```
+
+```
 
        *
       / \
@@ -737,13 +739,11 @@ EvaluateExpression("*")
 └── EvaluateExpression("2")     ← Recursion through RIGHT pointer
     └── Base case: return 2
 └── Result: 7 * 2 = 14
-
 ```
 
 7. Grid Path Counting
-```csharp
-// ...existing code...
 
+```csharp
 public class MultipleParameterRecursion
 {
     // Example 1: Grid Path Counting (Multiple Parameters)
@@ -867,3 +867,1014 @@ public class MultipleParameterRecursion
     }
 }
 ```
+
+8. Longest Common Subsequence
+```csharp
+using System;
+using System.Collections.Generic;
+
+public class RecursionOptimizationSolutions
+{
+    // NAIVE SOLUTION: O(2^(m+n)) - Exponential Disaster
+    public static int LongestCommonSubsequenceNaive(string text1, string text2)
+    {
+        return LongestCommonSubsequenceHelper(text1, text2, 0, 0);
+    }
+
+    private static int LongestCommonSubsequenceHelper(string text1, string text2, int i, int j)
+    {
+        // Base cases: if either string is exhausted, no more common characters
+        if (i >= text1.Length || j >= text2.Length)
+            return 0;
+
+        // If characters match, include this character and continue with both strings
+        if (text1[i] == text2[j])
+        {
+            return 1 + LongestCommonSubsequenceHelper(text1, text2, i + 1, j + 1);
+        }
+
+        // If characters don't match, try skipping from either string and take maximum
+        int skipText1 = LongestCommonSubsequenceHelper(text1, text2, i + 1, j);
+        int skipText2 = LongestCommonSubsequenceHelper(text1, text2, i, j + 1);
+
+        return Math.Max(skipText1, skipText2);
+    }
+
+    // MEMOIZED SOLUTION: O(m×n) - Polynomial Optimization
+    private static Dictionary<string, int> lcsMemo = new Dictionary<string, int>();
+
+    public static int LongestCommonSubsequenceMemoized(string text1, string text2)
+    {
+        lcsMemo.Clear(); // Reset memoization cache
+        return LongestCommonSubsequenceMemoizedHelper(text1, text2, 0, 0);
+    }
+
+    private static int LongestCommonSubsequenceMemoizedHelper(string text1, string text2, int i, int j)
+    {
+        // Create cache key from both indices
+        string key = $"{i}_{j}";
+
+        // Check if result already computed
+        if (lcsMemo.ContainsKey(key))
+            return lcsMemo[key];
+
+        int result;
+
+        // Same logic as naive version, but with caching
+        if (i >= text1.Length || j >= text2.Length)
+        {
+            result = 0;
+        }
+        else if (text1[i] == text2[j])
+        {
+            result = 1 + LongestCommonSubsequenceMemoizedHelper(text1, text2, i + 1, j + 1);
+        }
+        else
+        {
+            int skipText1 = LongestCommonSubsequenceMemoizedHelper(text1, text2, i + 1, j);
+            int skipText2 = LongestCommonSubsequenceMemoizedHelper(text1, text2, i, j + 1);
+            result = Math.Max(skipText1, skipText2);
+        }
+
+        // Store result in cache before returning
+        lcsMemo[key] = result;
+        return result;
+    }
+}
+```
+
+
+9.Island Counting
+```csharp
+public class GridAlgorithmsSolutions
+{
+    // Solution 2a: Island Counting with Multiple Parameter Recursion
+    public static int CountIslands(int[][] grid, bool includeDiagonal = false)
+    {
+        if (grid == null || grid.Length == 0 || grid[0].Length == 0)
+            return 0;
+
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+        bool[,] visited = new bool[rows, cols];
+        int islandCount = 0;
+
+        // Scan every cell in the grid
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                // If we find an unvisited land cell, it's a new island
+                if (grid[i][j] == 1 && !visited[i, j])
+                {
+                    islandCount++;
+                    ExploreIsland(grid, i, j, visited, includeDiagonal);
+                }
+            }
+        }
+
+        return islandCount;
+    }
+
+    private static void ExploreIsland(int[][] grid, int row, int col, bool[,] visited, bool includeDiagonal)
+    {
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+
+        // Base cases
+        if (row < 0 || row >= rows || col < 0 || col >= cols)
+            return; // Out of bounds
+
+        if (visited[row, col] || grid[row][col] != 1)
+            return; // Already visited or water
+
+        // Mark as visited
+        visited[row, col] = true;
+
+        // Explore all connected land cells (multiple parameter recursion)
+        // 4-directional movement
+        ExploreIsland(grid, row + 1, col, visited, includeDiagonal); // Down
+        ExploreIsland(grid, row - 1, col, visited, includeDiagonal); // Up
+        ExploreIsland(grid, row, col + 1, visited, includeDiagonal); // Right
+        ExploreIsland(grid, row, col - 1, visited, includeDiagonal); // Left
+
+        // 8-directional movement (include diagonals)
+        if (includeDiagonal)
+        {
+            ExploreIsland(grid, row + 1, col + 1, visited, includeDiagonal); // Down-Right
+            ExploreIsland(grid, row + 1, col - 1, visited, includeDiagonal); // Down-Left
+            ExploreIsland(grid, row - 1, col + 1, visited, includeDiagonal); // Up-Right
+            ExploreIsland(grid, row - 1, col - 1, visited, includeDiagonal); // Up-Left
+        }
+    }
+}
+```
+10.  Maximal Rectangle ad World Search
+```csharp
+// ...existing code...
+
+public class GridAlgorithmsSolutions
+{
+    // Solution 2a: Island Counting with Multiple Parameter Recursion
+    public static int CountIslands(int[][] grid, bool includeDiagonal = false)
+    {
+        if (grid == null || grid.Length == 0 || grid[0].Length == 0)
+            return 0;
+
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+        bool[,] visited = new bool[rows, cols];
+        int islandCount = 0;
+
+        // Scan every cell in the grid
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                // If we find an unvisited land cell, it's a new island
+                if (grid[i][j] == 1 && !visited[i, j])
+                {
+                    islandCount++;
+                    ExploreIsland(grid, i, j, visited, includeDiagonal);
+                }
+            }
+        }
+
+        return islandCount;
+    }
+
+    private static void ExploreIsland(int[][] grid, int row, int col, bool[,] visited, bool includeDiagonal)
+    {
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+
+        // Base cases
+        if (row < 0 || row >= rows || col < 0 || col >= cols)
+            return; // Out of bounds
+
+        if (visited[row, col] || grid[row][col] != 1)
+            return; // Already visited or water
+
+        // Mark as visited
+        visited[row, col] = true;
+
+        // Explore all connected land cells (multiple parameter recursion)
+        // 4-directional movement
+        ExploreIsland(grid, row + 1, col, visited, includeDiagonal); // Down
+        ExploreIsland(grid, row - 1, col, visited, includeDiagonal); // Up
+        ExploreIsland(grid, row, col + 1, visited, includeDiagonal); // Right
+        ExploreIsland(grid, row, col - 1, visited, includeDiagonal); // Left
+
+        // 8-directional movement (include diagonals)
+        if (includeDiagonal)
+        {
+            ExploreIsland(grid, row + 1, col + 1, visited, includeDiagonal); // Down-Right
+            ExploreIsland(grid, row + 1, col - 1, visited, includeDiagonal); // Down-Left
+            ExploreIsland(grid, row - 1, col + 1, visited, includeDiagonal); // Up-Right
+            ExploreIsland(grid, row - 1, col - 1, visited, includeDiagonal); // Up-Left
+        }
+    }
+
+    // Solution 2b: Largest Rectangle in Grid
+    public static int FindLargestRectangle(int[][] grid)
+    {
+        if (grid == null || grid.Length == 0 || grid[0].Length == 0)
+            return 0;
+
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+        int maxArea = 0;
+
+        // Try every possible rectangle starting position
+        for (int startRow = 0; startRow < rows; startRow++)
+        {
+            for (int startCol = 0; startCol < cols; startCol++)
+            {
+                if (grid[startRow][startCol] == 1)
+                {
+                    // Find largest rectangle starting from this position
+                    int area = FindLargestRectangleFrom(grid, startRow, startCol);
+                    maxArea = Math.Max(maxArea, area);
+                }
+            }
+        }
+
+        return maxArea;
+    }
+
+    private static int FindLargestRectangleFrom(int[][] grid, int startRow, int startCol)
+    {
+        int rows = grid.Length;
+        int cols = grid[0].Length;
+        int maxArea = 0;
+
+        // Try all possible rectangle sizes from this starting position
+        for (int endRow = startRow; endRow < rows; endRow++)
+        {
+            for (int endCol = startCol; endCol < cols; endCol++)
+            {
+                // Check if rectangle from (startRow, startCol) to (endRow, endCol) contains all 1s
+                if (IsValidRectangle(grid, startRow, startCol, endRow, endCol))
+                {
+                    int width = endCol - startCol + 1;
+                    int height = endRow - startRow + 1;
+                    int area = width * height;
+                    maxArea = Math.Max(maxArea, area);
+                }
+                else
+                {
+                    break; // No need to extend further in this row
+                }
+            }
+        }
+
+        return maxArea;
+    }
+
+    private static bool IsValidRectangle(int[][] grid, int startRow, int startCol, int endRow, int endCol)
+    {
+        for (int i = startRow; i <= endRow; i++)
+        {
+            for (int j = startCol; j <= endCol; j++)
+            {
+                if (grid[i][j] != 1)
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    // Solution 2c: Grid Word Search with Backtracking
+    public static bool WordSearch(char[][] board, string word)
+    {
+        if (board == null || board.Length == 0 || board[0].Length == 0)
+            return false;
+
+        if (string.IsNullOrEmpty(word))
+            return true;
+
+        int rows = board.Length;
+        int cols = board[0].Length;
+
+        // Try starting from every cell
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                if (board[i][j] == word[0])
+                {
+                    bool[,] visited = new bool[rows, cols];
+                    if (WordSearchHelper(board, word, i, j, 0, visited))
+                        return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool WordSearchHelper(char[][] board, string word, int row, int col,
+                                        int wordIndex, bool[,] visited)
+    {
+        // Base case: found complete word
+        if (wordIndex == word.Length)
+            return true;
+
+        // Base cases: invalid position or constraints
+        if (row < 0 || row >= board.Length || col < 0 || col >= board[0].Length)
+            return false;
+
+        if (visited[row, col])
+            return false;
+
+        if (board[row][col] != word[wordIndex])
+            return false;
+
+        // Mark current cell as visited
+        visited[row, col] = true;
+
+        // Try all 4 directions (multiple parameter recursion with backtracking)
+        bool found = WordSearchHelper(board, word, row + 1, col, wordIndex + 1, visited) || // Down
+                     WordSearchHelper(board, word, row - 1, col, wordIndex + 1, visited) || // Up
+                     WordSearchHelper(board, word, row, col + 1, wordIndex + 1, visited) || // Right
+                     WordSearchHelper(board, word, row, col - 1, wordIndex + 1, visited);   // Left
+
+        // Backtrack: unmark current cell
+        visited[row, col] = false;
+
+        return found;
+    }
+
+    // Enhanced version with path tracking
+    public static List<(int, int)> WordSearchWithPath(char[][] board, string word)
+    {
+        if (board == null || board.Length == 0 || board[0].Length == 0)
+            return new List<(int, int)>();
+
+        if (string.IsNullOrEmpty(word))
+            return new List<(int, int)>();
+
+        int rows = board.Length;
+        int cols = board[0].Length;
+
+        // Try starting from every cell
+        for (int i = 0; i < rows; i++)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                if (board[i][j] == word[0])
+                {
+                    bool[,] visited = new bool[rows, cols];
+                    var path = new List<(int, int)>();
+
+                    if (WordSearchHelperWithPath(board, word, i, j, 0, visited, path))
+                        return path;
+                }
+            }
+        }
+
+        return new List<(int, int)>();
+    }
+
+    private static bool WordSearchHelperWithPath(char[][] board, string word, int row, int col,
+                                                int wordIndex, bool[,] visited, List<(int, int)> path)
+    {
+        // Base case: found complete word
+        if (wordIndex == word.Length)
+            return true;
+
+        // Base cases: invalid position or constraints
+        if (row < 0 || row >= board.Length || col < 0 || col >= board[0].Length)
+            return false;
+
+        if (visited[row, col])
+            return false;
+
+        if (board[row][col] != word[wordIndex])
+            return false;
+
+        // Mark current cell as visited and add to path
+        visited[row, col] = true;
+        path.Add((row, col));
+
+        // Try all 4 directions
+        bool found = WordSearchHelperWithPath(board, word, row + 1, col, wordIndex + 1, visited, path) ||
+                     WordSearchHelperWithPath(board, word, row - 1, col, wordIndex + 1, visited, path) ||
+                     WordSearchHelperWithPath(board, word, row, col + 1, wordIndex + 1, visited, path) ||
+                     WordSearchHelperWithPath(board, word, row, col - 1, wordIndex + 1, visited, path);
+
+        // Backtrack if path not found
+        if (!found)
+        {
+            visited[row, col] = false;
+            path.RemoveAt(path.Count - 1);
+        }
+
+        return found;
+    }
+}
+```
+
+11. Collect All Valid Combinations with Global Results
+```csharp
+
+    // Solution 3b: Collect All Valid Combinations with Global Results
+    public static List<List<int>> GenerateAllCombinations(int[] nums, int target)
+    {
+        globalResults = new List<List<int>>(); // Reset global results
+        GenerateCombinationsHelper(nums, target, 0, 0, new List<int>());
+        return globalResults;
+    }
+
+    private static void GenerateCombinationsHelper(int[] nums, int target, int index,
+                                                  int currentSum, List<int> currentCombination)
+    {
+        // Base case: sum equals target - found valid combination
+        if (currentSum == target)
+        {
+            globalResults.Add(new List<int>(currentCombination)); // Add copy to global results
+            return;
+        }
+
+        // Base case: sum exceeds target or no more numbers
+        if (currentSum > target || index >= nums.Length)
+            return;
+
+        // Choice 1: Include current number (multiple parameter recursion)
+        currentCombination.Add(nums[index]);
+        GenerateCombinationsHelper(nums, target, index + 1, currentSum + nums[index], currentCombination);
+        currentCombination.RemoveAt(currentCombination.Count - 1); // Backtrack
+
+        // Choice 2: Skip current number
+        GenerateCombinationsHelper(nums, target, index + 1, currentSum, currentCombination);
+    }
+
+    // Alternative: Allow repeated use of numbers
+    public static List<List<int>> GenerateAllCombinationsWithRepetition(int[] nums, int target)
+    {
+        globalResults = new List<List<int>>();
+        GenerateCombinationsWithRepetitionHelper(nums, target, 0, 0, new List<int>());
+        return globalResults;
+    }
+
+    private static void GenerateCombinationsWithRepetitionHelper(int[] nums, int target, int index,
+                                                               int currentSum, List<int> currentCombination)
+    {
+        if (currentSum == target)
+        {
+            globalResults.Add(new List<int>(currentCombination));
+            return;
+        }
+
+        if (currentSum > target || index >= nums.Length)
+            return;
+
+        // For each remaining number, try using it multiple times
+        for (int i = index; i < nums.length; i++)
+        {
+            // Include current number and stay at same index (allow repetition)
+            currentCombination.Add(nums[i]);
+            GenerateCombinationsWithRepetitionHelper(nums, target, i, currentSum + nums[i], currentCombination);
+            currentCombination.RemoveAt(currentCombination.Count - 1); // Backtrack
+        }
+    }
+```
+
+## Advanced Memoization Techniques
+### Pattern 1: Multi-Dimensional Memoization
+``` csharp
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+
+public class MultiDimensionalMemoization
+{
+    // Example 1: Grid Path Counting - From O(4^(m×n)) to O(m×n)
+
+    // NAIVE RECURSION: Exponential disaster
+    public static long CountPathsNaive(int[][] grid, int row, int col, int targetRow, int targetCol)
+    {
+        // Base cases
+        if (row < 0 || row >= grid.Length || col < 0 || col >= grid[0].Length)
+            return 0; // Out of bounds
+
+        if (grid[row][col] == 1)
+            return 0; // Obstacle
+
+        if (row == targetRow && col == targetCol)
+            return 1; // Reached destination
+
+        // Exponential explosion: 4 recursive calls per cell
+        return CountPathsNaive(grid, row + 1, col, targetRow, targetCol) +     // Down
+               CountPathsNaive(grid, row - 1, col, targetRow, targetCol) +     // Up
+               CountPathsNaive(grid, row, col + 1, targetRow, targetCol) +     // Right
+               CountPathsNaive(grid, row, col - 1, targetRow, targetCol);      // Left
+    }
+
+    // MEMOIZED VERSION: Linear optimization
+    private static Dictionary<string, long> pathMemo = new Dictionary<string, long>();
+
+    public static long CountPathsMemoized(int[][] grid, int row, int col, int targetRow, int targetCol)
+    {
+        // Create cache key from multiple parameters
+        string key = $"{row}_{col}_{targetRow}_{targetCol}";
+
+        // Check cache first
+        if (pathMemo.ContainsKey(key))
+            return pathMemo[key];
+
+        long result;
+
+        // Same logic as naive version
+        if (row < 0 || row >= grid.Length || col < 0 || col >= grid[0].Length)
+        {
+            result = 0;
+        }
+        else if (grid[row][col] == 1)
+        {
+            result = 0;
+        }
+        else if (row == targetRow && col == targetCol)
+        {
+            result = 1;
+        }
+        else
+        {
+            // Same recursive structure, but results are cached
+            result = CountPathsMemoized(grid, row + 1, col, targetRow, targetCol) +
+                     CountPathsMemoized(grid, row - 1, col, targetRow, targetCol) +
+                     CountPathsMemoized(grid, row, col + 1, targetRow, targetCol) +
+                     CountPathsMemoized(grid, row, col - 1, targetRow, targetCol);
+        }
+
+        // Cache result before returning
+        pathMemo[key] = result;
+        return result;
+    }
+
+    public static void ResetPathMemo()
+    {
+        pathMemo.Clear();
+    }
+
+    // Alternative: 2D Array Memoization (when parameters are bounded integers)
+    private static long[,] pathMemo2D;
+    private static bool[,] computed;
+
+    public static long CountPathsArray2D(int[][] grid, int row, int col, int targetRow, int targetCol)
+    {
+        // Initialize memo arrays on first call
+        if (pathMemo2D == null)
+        {
+            int maxRows = grid.Length;
+            int maxCols = grid[0].Length;
+            pathMemo2D = new long[maxRows, maxCols];
+            computed = new bool[maxRows, maxCols];
+        }
+
+        // Check if already computed
+        if (computed[row, col])
+            return pathMemo2D[row, col];
+
+        long result;
+
+        // Base cases (same as before)
+        if (row < 0 || row >= grid.Length || col < 0 || col >= grid[0].Length)
+        {
+            result = 0;
+        }
+        else if (grid[row][col] == 1)
+        {
+            result = 0;
+        }
+        else if (row == targetRow && col == targetCol)
+        {
+            result = 1;
+        }
+        else
+        {
+            result = CountPathsArray2D(grid, row + 1, col, targetRow, targetCol) +
+                     CountPathsArray2D(grid, row - 1, col, targetRow, targetCol) +
+                     CountPathsArray2D(grid, row, col + 1, targetRow, targetCol) +
+                     CountPathsArray2D(grid, row, col - 1, targetRow, targetCol);
+        }
+
+        // Store result and mark as computed
+        pathMemo2D[row, col] = result;
+        computed[row, col] = true;
+
+        return result;
+    }
+}
+```
+
+### Pattern 2: Complex State Memoization
+```csharp
+public class ComplexStateMemoization
+{
+    // Example: Combination Sum with Complex State
+    public class CombinationState
+    {
+        public int Index { get; set; }
+        public int RemainingSum { get; set; }
+        public bool CanRepeat { get; set; }
+
+        // Override Equals and GetHashCode for Dictionary keys
+        public override bool Equals(object obj)
+        {
+            if (obj is CombinationState other)
+            {
+                return Index == other.Index &&
+                       RemainingSum == other.RemainingSum &&
+                       CanRepeat == other.CanRepeat;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Index, RemainingSum, CanRepeat);
+        }
+
+        public override string ToString()
+        {
+            return $"({Index},{RemainingSum},{CanRepeat})";
+        }
+    }
+
+    // Memoization with complex state objects
+    private static Dictionary<CombinationState, int> complexMemo = new Dictionary<CombinationState, int>();
+
+    public static int CountCombinations(int[] nums, int target, bool canRepeat = false)
+    {
+        complexMemo.Clear();
+        return CountCombinationsHelper(nums, 0, target, canRepeat);
+    }
+
+    private static int CountCombinationsHelper(int[] nums, int index, int remainingSum, bool canRepeat)
+    {
+        var state = new CombinationState
+        {
+            Index = index,
+            RemainingSum = remainingSum,
+            CanRepeat = canRepeat
+        };
+
+        // Check memoization
+        if (complexMemo.ContainsKey(state))
+            return complexMemo[state];
+
+        int result;
+
+        // Base cases
+        if (remainingSum == 0)
+        {
+            result = 1; // Found valid combination
+        }
+        else if (remainingSum < 0 || index >= nums.Length)
+        {
+            result = 0; // Invalid state
+        }
+        else
+        {
+            // Include current number
+            int include = CountCombinationsHelper(nums, canRepeat ? index : index + 1,
+                                                 remainingSum - nums[index], canRepeat);
+
+            // Skip current number
+            int skip = CountCombinationsHelper(nums, index + 1, remainingSum, canRepeat);
+
+            result = include + skip;
+        }
+
+        // Store in memoization table
+        complexMemo[state] = result;
+        return result;
+    }
+
+    public static void DisplayMemoStats()
+    {
+        Console.WriteLine($"Complex memo entries: {complexMemo.Count}");
+        foreach (var kvp in complexMemo.Take(5))
+        {
+            Console.WriteLine($"  State {kvp.Key} => {kvp.Value}");
+        }
+    }
+}
+```
+
+
+
+## 🎯 Optimization Progression
+
+### 1. Naive Recursion
+
+* ⏰ **Time:** Often `O(2^n)` or worse
+* 💾 **Space:** `O(depth)` recursion stack
+* ✅ **Pros:** Easy to understand and write
+* ❌ **Cons:** Exponential complexity, stack overflow risk
+
+---
+
+### 2. Memoization (Top-down DP)
+
+* ⏰ **Time:** `O(states)` — polynomial
+* 💾 **Space:** `O(states)` + `O(depth)` recursion stack
+* ✅ **Pros:** Easy conversion from recursion, only computes needed states
+* ❌ **Cons:** Recursion overhead, more complex cache management
+
+---
+
+### 3. Iterative DP (Bottom-up)
+
+* ⏰ **Time:** `O(states)` — same as memoization
+* 💾 **Space:** `O(states)` — no recursion stack
+* ✅ **Pros:** No recursion overhead, predictable space usage
+* ❌ **Cons:** Must compute all states, less intuitive
+
+---
+
+### 4. Space-Optimized DP
+
+* ⏰ **Time:** `O(states)` — same complexity
+* 💾 **Space:** `O(1)` to `O(smaller dimension)`
+* ✅ **Pros:** Minimal memory usage, production-ready
+* ❌ **Cons:** Most complex to implement and debug
+
+---
+
+### 🧭 Optimization Decision Framework
+
+## 🤔 When to Use Each Approach
+
+### 🧩 Use Naive Recursion When:
+
+* Understanding the problem structure
+* Input size is small (`n < 20`)
+* Prototyping and initial problem solving
+* Teaching or explaining recursion
+
+---
+
+### 💡 Use Memoization When:
+
+* Converting existing recursive solution
+* Not all states are needed (sparse state space)
+* Complex state relationships
+* Easier to implement than bottom-up
+
+---
+
+### ⚙️ Use Iterative DP When:
+
+* All states need to be computed anyway
+* Want predictable performance
+* Avoiding recursion stack limitations
+* Production systems with performance requirements
+
+---
+
+### 🧮 Use Space-Optimized DP When:
+
+* Memory is constrained
+* Only need the final result, not intermediate states
+* Processing very large inputs
+* Competitive programming optimization
+
+---
+
+# 🌉 Bridge: Recursion → Dynamic Programming
+
+## 🎓 Recursion Mastery Achieved
+
+* ✅ Direct recursion patterns and complexity analysis
+* ✅ Mutual recursion and interdependent function calls
+* ✅ Indirect recursion through data structures
+* ✅ Multiple parameter recursion for complex state spaces
+* ✅ Global state management in recursive algorithms
+* ✅ Systematic optimization through memoization
+
+---
+
+## 🔄 The Optimization Journey
+
+`Recursion → Identify overlapping subproblems`
+`Memoization → Add caching layer`
+`Iterative DP → Remove recursion overhead`
+`Optimized DP → Minimize space complexity`
+
+---
+
+## 🎯 Dynamic Programming Readiness
+
+* 📚 Understand optimal substructure principle
+* 📚 Identify overlapping subproblems instantly
+* 📚 Know when memoization transforms complexity
+* 📚 Convert top-down to bottom-up approaches
+* 📚 Recognize classic DP problem patterns
+
+---
+
+
+
+## 🔗 DP Preview Connections
+
+* **Fibonacci** → Linear DP fundamentals
+* **Grid Paths** → 2D DP and coordinate systems
+* **LCS / Edit Distance** → String DP patterns
+* **Coin Change** → Unbounded knapsack family
+* **House Robber** → State machine DP
+
+---
+
+## ✨ Mastery Indicators
+
+* 🎯 Can write any recursive solution with proper base cases
+* 🎯 Can identify exponential complexity patterns instantly
+* 🎯 Can add memoization to any recursive function
+* 🎯 Can analyze when problems have optimal substructure
+* 🎯 Can predict which problems benefit from DP
+
+
+
+
+
+# BACKTRACKING
+
+## Definition
+Backtracking is a systematic search technique that builds candidate solutions incrementally and abandons a candidate ("backtracks") as soon as it determines the candidate cannot lead to a valid solution. It is built on recursion plus explicit state management and is commonly used for combinatorial search, constraint satisfaction, and puzzle solving.
+
+### Key characteristics
+- Explore all (or many) possible configurations by incremental construction.
+- Choose → Explore → Unchoose (choose, recurse, undo choice).
+- Heavy use of pruning to reduce search space.
+- Finds all solutions or a single valid solution depending on stopping condition.
+- Time complexity: often exponential in input size; Space: O(depth) for recursion stack + state.
+
+### Typical pattern
+1. Maintain current state (path, partial solution, visited markers, counters).
+2. Check base case (complete/invalid).
+3. Iterate over choices:
+    - Make choice (modify state).
+    - Recurse.
+    - Undo choice (restore state).
+
+### Common techniques
+- Pruning: reject partial solutions early using constraints.
+- Ordering/heuristics: try promising choices first.
+- Memoization / DP hybrid: cache equivalent states where applicable.
+- Constraint propagation: reduce available choices before recursion.
+
+### When to use
+- Enumerating combinations/permutations/subsets.
+- Solving puzzles (N-Queens, Sudoku, word search).
+- Backtracking + pruning outperforms brute force for constrained problems.
+- Use DP/memoization when overlapping subproblems dominate.
+
+### Simple C# template
+```csharp
+public class BacktrackingTemplate
+{
+    // THE UNIVERSAL BACKTRACKING TEMPLATE
+    // This pattern applies to 90% of backtracking problems
+
+    public static void Backtrack<T>(
+        List<T> candidates,           // Available choices
+        List<T> currentSolution,      // Current partial solution being built
+        List<List<T>> allSolutions,   // Collection of all valid solutions
+        Func<List<T>, bool> isValid,  // Function to check if solution is valid
+        Func<List<T>, bool> isComplete) // Function to check if solution is complete
+    {
+        // BASE CASE: Check if we have a complete solution
+        if (isComplete(currentSolution))
+        {
+            // Found a valid solution - add a COPY to results
+            allSolutions.Add(new List<T>(currentSolution));
+            return;
+        }
+
+        // RECURSIVE CASE: Try each candidate choice
+        foreach (T candidate in candidates)
+        {
+            // CHOOSE: Make a choice by adding candidate to current solution
+            currentSolution.Add(candidate);
+
+            // CONSTRAINT CHECK: Only explore if current state is valid
+            if (isValid(currentSolution))
+            {
+                // EXPLORE: Recursively search from this state
+                Backtrack(candidates, currentSolution, allSolutions, isValid, isComplete);
+            }
+
+            // UNCHOOSE: Remove the choice to try other options (BACKTRACK!)
+            currentSolution.RemoveAt(currentSolution.Count - 1);
+        }
+    }
+}
+```
+
+## Visualizing Backtracking
+Choose → Explore → Unchoose Visualization
+```plaintext
+          Start
+            |
+         [Choose]
+            |
+        +---+---+
+        |       |
+     Choice1  Choice2
+        |       |
+     [Explore][Explore]
+        |       |
+     +--+--+  +--+--+
+     |     |  |     |
+   Valid  Invalid  Valid
+    |        |      |
+ [Unchoose] [Unchoose]
+    |        |      |
+   Back    Back    Back
+    |        |      |
+   ...      ...    ...
+```
+
+```
+State: []
+  ↓
+CHOOSE: Add 'A' → State: [A]
+  ↓
+EXPLORE: Recursively try all possibilities with [A]
+  ↓
+UNCHOOSE: Remove 'A' → State: []
+  ↓
+CHOOSE: Add 'B' → State: [B]
+  ↓
+EXPLORE: Recursively try all possibilities with [B]
+  ↓
+UNCHOOSE: Remove 'B' → State: []
+  ↓
+... continue with other choices
+```
+
+
+## Pattern
+```csharp
+public static class DuplicateHandlingPatterns
+{
+    // PATTERN 1: Subsets with duplicates
+    public static void SubsetsPattern(int[] nums, int start)
+    {
+        // Key: Sort first, then skip consecutive duplicates
+        // Skip condition: i > start && nums[i] == nums[i-1]
+
+        for (int i = start; i < nums.Length; i++)
+        {
+            if (i > start && nums[i] == nums[i - 1])
+                continue; // Skip duplicate
+
+            // Process nums[i]...
+        }
+    }
+
+    // PATTERN 2: Combinations with duplicates
+    public static void CombinationsPattern(int[] nums, int k, int start)
+    {
+        // Same duplicate handling as subsets
+        // Plus size constraint
+
+        for (int i = start; i < nums.Length; i++)
+        {
+            if (i > start && nums[i] == nums[i - 1])
+                continue; // Skip duplicate
+
+            // Process nums[i]...
+        }
+    }
+
+    // PATTERN 3: Permutations with duplicates
+    public static void PermutationsPattern(int[] nums, bool[] used)
+    {
+        // Different! Need used array AND duplicate check
+
+        for (int i = 0; i < nums.Length; i++)
+        {
+            if (used[i])
+                continue;
+
+            // Skip if same value and previous occurrence not used
+            if (i > 0 && nums[i] == nums[i - 1] && !used[i - 1])
+                continue; // Skip duplicate
+
+            used[i] = true;
+            // Process nums[i]...
+            used[i] = false;
+        }
+    }
+}
+```
+
+When to Use Each Pattern:
+- **Subsets with Duplicates:** When generating all unique subsets from a list that may contain duplicates. Sort the input and skip consecutive duplicates during iteration.
+- **Combinations with Duplicates:** When generating combinations of a specific size from a list with duplicates. Similar to subsets, sort and skip duplicates, while also enforcing size constraints.
+- **Permutations with Duplicates:** When generating all unique permutations from a list with duplicates. Use a 'used' array to track which elements are included, and skip duplicates based on usage of previous identical elements.
+
+
