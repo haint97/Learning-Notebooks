@@ -772,3 +772,1000 @@ For 8-direction movement:
 int[] rowDirs = {-1,-1,-1, 0, 0, 1, 1, 1};
 int[] colDirs = {-1, 0, 1,-1, 1,-1, 0, 1};
 ```
+
+## Example Grid Backtracking Problems
+### 1. Maze Solver (Path Finding)Problem: Given a 2D grid maze with walls and open paths, find a path from start to end.
+
+The classic maze problem demonstrates all grid backtracking concepts.
+
+```csharp
+public class MazeSolver
+{
+    // Maze: 0 = path, 1 = wall, S = start, E = end
+    // Find if path exists from S to E
+
+    private static readonly int[] rowDirs = { -1, 1, 0, 0 };
+    private static readonly int[] colDirs = { 0, 0, -1, 1 };
+    private static readonly string[] dirNames = { "UP", "DOWN", "LEFT", "RIGHT" };
+
+    public static bool SolveMaze(int[][] maze,
+                                (int row, int col) start,
+                                (int row, int col) end)
+    {
+        int rows = maze.Length;
+        int cols = maze[0].Length;
+
+        bool[][] visited = new bool[rows][];
+        for (int i = 0; i < rows; i++)
+        {
+            visited[i] = new bool[cols];
+        }
+
+        var path = new List<(int, int)>();
+
+        bool found = Backtrack(maze, start.row, start.col, end, visited, path);
+
+        if (found)
+        {
+            Console.WriteLine("Path found:");
+            foreach (var (r, c) in path)
+            {
+                Console.WriteLine($"  ({r},{c})");
+            }
+        }
+        else
+        {
+            Console.WriteLine("No path exists!");
+        }
+
+        return found;
+    }
+
+    private static bool Backtrack(int[][] maze, int row, int col,
+                                 (int row, int col) end,
+                                 bool[][] visited,
+                                 List<(int, int)> path)
+    {
+        // BASE CASE 1: Out of bounds
+        if (row < 0 || row >= maze.Length ||
+            col < 0 || col >= maze[0].Length)
+        {
+            return false;
+        }
+
+        // BASE CASE 2: Wall (obstacle)
+        if (maze[row][col] == 1)
+        {
+            return false;
+        }
+
+        // BASE CASE 3: Already visited (avoid cycles)
+        if (visited[row][col])
+        {
+            return false;
+        }
+
+        // CHOOSE: Mark as visited and add to path
+        visited[row][col] = true;
+        path.Add((row, col));
+
+        // BASE CASE 4: Reached destination
+        if (row == end.row && col == end.col)
+        {
+            return true; // Success! Keep the path
+        }
+
+        // EXPLORE: Try all 4 directions
+        for (int dir = 0; dir < 4; dir++)
+        {
+            int newRow = row + rowDirs[dir];
+            int newCol = col + colDirs[dir];
+
+            // Recursively search from new position
+            if (Backtrack(maze, newRow, newCol, end, visited, path))
+            {
+                return true; // Found path through this direction
+            }
+        }
+
+        // UNCHOOSE: Backtrack - this path didn't work
+        visited[row][col] = false;
+        path.RemoveAt(path.Count - 1);
+
+        return false;
+    }
+
+    // Enhanced version with detailed trace
+    public static bool SolveMazeWithTrace(int[][] maze,
+                                         (int row, int col) start,
+                                         (int row, int col) end)
+    {
+        Console.WriteLine("=== MAZE SOLVER WITH TRACE ===");
+        Console.WriteLine("Maze:");
+        PrintMaze(maze, start, end);
+        Console.WriteLine();
+
+        int rows = maze.Length;
+        int cols = maze[0].Length;
+
+        bool[][] visited = new bool[rows][];
+        for (int i = 0; i < rows; i++)
+        {
+            visited[i] = new bool[cols];
+        }
+
+        var path = new List<(int, int)>();
+
+        bool found = BacktrackTrace(maze, start.row, start.col, end,
+                                   visited, path, 0);
+
+        Console.WriteLine($"\n=== PATH {'(FOUND)' : 'NOT FOUND'} ===");
+
+        return found;
+    }
+
+    private static bool BacktrackTrace(int[][] maze, int row, int col,
+                                      (int row, int col) end,
+                                      bool[][] visited,
+                                      List<(int, int)> path,
+                                      int depth)
+    {
+        string indent = new string(' ', depth * 2);
+
+        Console.WriteLine($"{indent}Exploring ({row},{col})...");
+
+        // Boundary check
+        if (row < 0 || row >= maze.Length ||
+            col < 0 || col >= maze[0].Length)
+        {
+            Console.WriteLine($"{indent}  ✗ Out of bounds");
+            return false;
+        }
+
+        // Wall check
+        if (maze[row][col] == 1)
+        {
+            Console.WriteLine($"{indent}  ✗ Wall (obstacle)");
+            return false;
+        }
+
+        // Visited check
+        if (visited[row][col])
+        {
+            Console.WriteLine($"{indent}  ✗ Already visited");
+            return false;
+        }
+
+        // Mark visited and add to path
+        visited[row][col] = true;
+        path.Add((row, col));
+        Console.WriteLine($"{indent}  ✓ Added to path (length: {path.Count})");
+
+        // Goal check
+        if (row == end.row && col == end.col)
+        {
+            Console.WriteLine($"{indent}  ★ GOAL REACHED!");
+            return true;
+        }
+
+        // Try all 4 directions
+        for (int dir = 0; dir < 4; dir++)
+        {
+            int newRow = row + rowDirs[dir];
+            int newCol = col + colDirs[dir];
+
+            Console.WriteLine($"{indent}  → Try {dirNames[dir]} to ({newRow},{newCol})");
+
+            if (BacktrackTrace(maze, newRow, newCol, end, visited, path, depth + 1))
+            {
+                Console.WriteLine($"{indent}  ← {dirNames[dir]} succeeded!");
+                return true;
+            }
+
+            Console.WriteLine($"{indent}  ← {dirNames[dir]} failed");
+        }
+
+        // Backtrack
+        visited[row][col] = false;
+        path.RemoveAt(path.Count - 1);
+        Console.WriteLine($"{indent}  ⟲ BACKTRACK from ({row},{col})");
+
+        return false;
+    }
+
+    private static void PrintMaze(int[][] maze, (int r, int c) start, (int r, int c) end)
+    {
+        for (int r = 0; r < maze.Length; r++)
+        {
+            for (int c = 0; c < maze[0].Length; c++)
+            {
+                if (r == start.r && c == start.c)
+                    Console.Write("S ");
+                else if (r == end.r && c == end.c)
+                    Console.Write("E ");
+                else if (maze[r][c] == 1)
+                    Console.Write("█ ");
+                else
+                    Console.Write(". ");
+            }
+            Console.WriteLine();
+        }
+    }
+}
+
+
+public static class MazeExamples
+{
+    public static void DemonstrateSimpleMaze()
+    {
+        Console.WriteLine("=== SIMPLE MAZE EXAMPLE ===\n");
+
+        // Maze representation: 0 = path, 1 = wall
+        int[][] maze = new int[][]
+        {
+            new int[] { 0, 1, 0, 0, 0 },
+            new int[] { 0, 1, 0, 1, 0 },
+            new int[] { 0, 0, 0, 1, 0 },
+            new int[] { 1, 1, 0, 0, 0 },
+            new int[] { 0, 0, 0, 1, 0 }
+        };
+
+        var start = (row: 0, col: 0);  // Top-left
+        var end = (row: 4, col: 4);    // Bottom-right
+
+        Console.WriteLine("Maze (S=start, E=end, █=wall, .=path):");
+        PrintMazeWithPath(maze, start, end, new List<(int, int)>());
+
+        // Solve with trace
+        MazeSolver.SolveMazeWithTrace(maze, start, end);
+    }
+
+    private static void PrintMazeWithPath(int[][] maze,
+                                         (int r, int c) start,
+                                         (int r, int c) end,
+                                         List<(int r, int c)> path)
+    {
+        var pathSet = new HashSet<(int, int)>(path);
+
+        for (int r = 0; r < maze.Length; r++)
+        {
+            for (int c = 0; c < maze[0].Length; c++)
+            {
+                if (r == start.r && c == start.c)
+                    Console.Write("S ");
+                else if (r == end.r && c == end.c)
+                    Console.Write("E ");
+                else if (pathSet.Contains((r, c)))
+                    Console.Write("* ");
+                else if (maze[r][c] == 1)
+                    Console.Write("█ ");
+                else
+                    Console.Write(". ");
+            }
+            Console.WriteLine();
+        }
+    }
+}
+```
+
+```
+Initial Maze:
+S █ . . .
+. █ . █ .
+. . . █ .
+█ █ . . .
+. . . █ E
+
+Step-by-step exploration:
+
+Step 1: Start at (0,0)
+Current: (0,0)
+* █ . . .      Try UP → out of bounds
+. █ . █ .      Try DOWN → (1,0) valid
+. . . █ .      Try LEFT → out of bounds
+█ █ . . .      Try RIGHT → (0,1) wall
+. . . █ E
+
+Step 2: Move to (1,0)
+* █ . . .      Try UP → (0,0) visited
+* █ . █ .      Try DOWN → (2,0) valid
+. . . █ .      Try LEFT → out of bounds
+█ █ . . .      Try RIGHT → (1,1) wall
+. . . █ E
+
+Step 3: Move to (2,0)
+* █ . . .      Try UP → (1,0) visited
+* █ . █ .      Try DOWN → (3,0) wall
+* . . █ .      Try LEFT → out of bounds
+█ █ . . .      Try RIGHT → (2,1) valid
+. . . █ E
+
+Step 4: Move to (2,1)
+* █ . . .      Try UP → (1,1) wall
+* █ . █ .      Try DOWN → (3,1) wall
+* * . █ .      Try LEFT → (2,0) visited
+█ █ . . .      Try RIGHT → (2,2) valid
+. . . █ E
+
+Step 5: Move to (2,2)
+* █ . . .      Try UP → (1,2) path, explore...
+* █ . █ .      Try DOWN → (3,2) path, explore...
+* * * █ .      Try LEFT → (2,1) visited
+█ █ . . .      Try RIGHT → (2,3) wall
+. . . █ E
+
+... (exploration continues) ...
+
+Final successful path marked with *:
+* █ . . .
+* █ . █ .
+* * * █ .
+█ █ * * *
+. . . █ *
+```
+
+### 2. Word Search Problem: Given a 2D grid of letters and a word, determine if the word exists in the grid by moving horizontally or vertically.
+
+Problem: Given a 2D board and a word, find if the word exists in the grid.
+The word can be constructed from letters of sequentially adjacent cells,where "adjacent" cells are horizontally or vertically neighboring.
+The same letter cell may not be used more than once.
+```csharp
+public class WordSearch
+{
+    // Problem: Given a 2D board and a word, find if the word exists in the grid.
+    // The word can be constructed from letters of sequentially adjacent cells,
+    // where "adjacent" cells are horizontally or vertically neighboring.
+    // The same letter cell may not be used more than once.
+
+    private static readonly int[] rowDirs = { -1, 1, 0, 0 };
+    private static readonly int[] colDirs = { 0, 0, -1, 1 };
+
+    public static bool ExistWord(char[][] board, string word)
+    {
+        if (board == null || board.Length == 0 || word == null || word.Length == 0)
+            return false;
+
+        int rows = board.Length;
+        int cols = board[0].Length;
+
+        // Try starting from every cell
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                // If first character matches, start backtracking from this cell
+                if (board[r][c] == word[0])
+                {
+                    bool[][] visited = new bool[rows][];
+                    for (int i = 0; i < rows; i++)
+                    {
+                        visited[i] = new bool[cols];
+                    }
+
+                    if (Backtrack(board, word, 0, r, c, visited))
+                    {
+                        return true; // Found the word
+                    }
+                }
+            }
+        }
+
+        return false; // Word not found
+    }
+
+    private static bool Backtrack(char[][] board, string word, int index,
+                                 int row, int col, bool[][] visited)
+    {
+        // BASE CASE 1: Found complete word
+        if (index == word.Length)
+        {
+            return true;
+        }
+
+        // BASE CASE 2: Out of bounds
+        if (row < 0 || row >= board.Length ||
+            col < 0 || col >= board[0].Length)
+        {
+            return false;
+        }
+
+        // BASE CASE 3: Already visited
+        if (visited[row][col])
+        {
+            return false;
+        }
+
+        // BASE CASE 4: Character doesn't match
+        if (board[row][col] != word[index])
+        {
+            return false;
+        }
+
+        // CHOOSE: Mark current cell as visited
+        visited[row][col] = true;
+
+        // EXPLORE: Try all 4 directions for next character
+        for (int dir = 0; dir < 4; dir++)
+        {
+            int newRow = row + rowDirs[dir];
+            int newCol = col + colDirs[dir];
+
+            // Recursively search for next character
+            if (Backtrack(board, word, index + 1, newRow, newCol, visited))
+            {
+                return true; // Found path to complete word
+            }
+        }
+
+        // UNCHOOSE: Backtrack - unmark visited
+        visited[row][col] = false;
+
+        return false; // No path from this cell
+    }
+
+    // Enhanced version with visualization
+    public static bool ExistWordWithTrace(char[][] board, string word)
+    {
+        Console.WriteLine($"=== WORD SEARCH: '{word}' ===\n");
+        Console.WriteLine("Board:");
+        PrintBoard(board);
+        Console.WriteLine();
+
+        if (board == null || board.Length == 0 || word == null || word.Length == 0)
+            return false;
+
+        int rows = board.Length;
+        int cols = board[0].Length;
+
+        // Try starting from every cell
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                if (board[r][c] == word[0])
+                {
+                    Console.WriteLine($"Starting search from ({r},{c}) - matches '{word[0]}'");
+
+                    bool[][] visited = new bool[rows][];
+                    for (int i = 0; i < rows; i++)
+                    {
+                        visited[i] = new bool[cols];
+                    }
+
+                    if (BacktrackTrace(board, word, 0, r, c, visited, 0))
+                    {
+                        Console.WriteLine($"\n★ WORD FOUND starting from ({r},{c})!");
+                        return true;
+                    }
+
+                    Console.WriteLine($"Word not found from ({r},{c})\n");
+                }
+            }
+        }
+
+        Console.WriteLine("✗ Word not found anywhere in the board");
+        return false;
+    }
+
+    private static bool BacktrackTrace(char[][] board, string word, int index,
+                                      int row, int col, bool[][] visited, int depth)
+    {
+        string indent = new string(' ', depth * 2);
+
+        // Check bounds
+        if (row < 0 || row >= board.Length ||
+            col < 0 || col >= board[0].Length)
+        {
+            Console.WriteLine($"{indent}✗ ({row},{col}) out of bounds");
+            return false;
+        }
+
+        // Check visited
+        if (visited[row][col])
+        {
+            Console.WriteLine($"{indent}✗ ({row},{col}) already visited");
+            return false;
+        }
+
+        // Check character match
+        if (board[row][col] != word[index])
+        {
+            Console.WriteLine($"{indent}✗ ({row},{col})='{board[row][col]}' doesn't match '{word[index]}'");
+            return false;
+        }
+
+        Console.WriteLine($"{indent}✓ ({row},{col})='{board[row][col]}' matches word[{index}]='{word[index]}'");
+
+        // Check if word complete
+        if (index == word.Length - 1)
+        {
+            Console.WriteLine($"{indent}★ COMPLETE WORD FOUND!");
+            return true;
+        }
+
+        // Mark visited
+        visited[row][col] = true;
+        Console.WriteLine($"{indent}  Searching for next char '{word[index + 1]}'...");
+
+        // Try all 4 directions
+        string[] dirNames = { "UP", "DOWN", "LEFT", "RIGHT" };
+        for (int dir = 0; dir < 4; dir++)
+        {
+            int newRow = row + rowDirs[dir];
+            int newCol = col + colDirs[dir];
+
+            Console.WriteLine($"{indent}  → Try {dirNames[dir]} to ({newRow},{newCol})");
+
+            if (BacktrackTrace(board, word, index + 1, newRow, newCol, visited, depth + 1))
+            {
+                return true;
+            }
+        }
+
+        // Backtrack
+        visited[row][col] = false;
+        Console.WriteLine($"{indent}  ⟲ BACKTRACK from ({row},{col})");
+
+        return false;
+    }
+
+    private static void PrintBoard(char[][] board)
+    {
+        for (int r = 0; r < board.Length; r++)
+        {
+            for (int c = 0; c < board[0].Length; c++)
+            {
+                Console.Write(board[r][c] + " ");
+            }
+            Console.WriteLine();
+        }
+    }
+}
+```
+
+### 3. Constraint Satisfaction Problems (CSP)
+
+While maze and word search involve path finding, Constraint Satisfaction Problems involve configuration finding - arranging elements to satisfy multiple constraints simultaneously.
+
+- **Key Characteristics**:
+  - Variables: What we need to assign (e.g., queen positions)
+  - Domains: Possible values for each variable (e.g., column positions)
+  - Constraints: Rules that must be satisfied (e.g., no two queens attack each other)
+
+#### N-Queens Problem
+
+```csharp
+public class NQueensVisualization
+{
+    public static List<List<string>> SolveNQueensWithTrace(int n)
+    {
+        Console.WriteLine($"=== SOLVING {n}-QUEENS PROBLEM ===\n");
+
+        var solutions = new List<List<string>>();
+        var board = new char[n][];
+
+        for (int i = 0; i < n; i++)
+        {
+            board[i] = new char[n];
+            for (int j = 0; j < n; j++)
+            {
+                board[i][j] = '.';
+            }
+        }
+
+        BacktrackTrace(board, 0, solutions, 0);
+
+        Console.WriteLine($"\n=== TOTAL SOLUTIONS FOUND: {solutions.Count} ===");
+
+        return solutions;
+    }
+
+    private static void BacktrackTrace(char[][] board, int row,
+                                      List<List<string>> solutions, int depth)
+    {
+        int n = board.Length;
+        string indent = new string(' ', depth * 2);
+
+        // Check if all queens placed
+        if (row == n)
+        {
+            Console.WriteLine($"{indent}★ SOLUTION FOUND!");
+            PrintBoard(board, indent + "  ");
+            solutions.Add(BoardToStringList(board));
+            return;
+        }
+
+        Console.WriteLine($"{indent}Processing Row {row}:");
+
+        // Try placing queen in each column
+        for (int col = 0; col < n; col++)
+        {
+            Console.WriteLine($"{indent}  Trying column {col}...");
+
+            if (IsSafeTrace(board, row, col, indent + "    "))
+            {
+                Console.WriteLine($"{indent}    ✓ Safe! Placing queen at ({row},{col})");
+
+                // Place queen
+                board[row][col] = 'Q';
+                PrintBoard(board, indent + "    ");
+
+                // Explore next row
+                BacktrackTrace(board, row + 1, solutions, depth + 1);
+
+                // Remove queen (backtrack)
+                board[row][col] = '.';
+                Console.WriteLine($"{indent}    ⟲ BACKTRACK: Removed queen from ({row},{col})");
+            }
+            else
+            {
+                Console.WriteLine($"{indent}    ✗ Unsafe! Cannot place queen at ({row},{col})");
+            }
+        }
+    }
+
+    private static bool IsSafeTrace(char[][] board, int row, int col, string indent)
+    {
+        int n = board.Length;
+
+        // Check column
+        for (int r = 0; r < row; r++)
+        {
+            if (board[r][col] == 'Q')
+            {
+                Console.WriteLine($"{indent}Conflict: Queen at ({r},{col}) - same column");
+                return false;
+            }
+        }
+
+        // Check upper-left diagonal
+        for (int r = row - 1, c = col - 1; r >= 0 && c >= 0; r--, c--)
+        {
+            if (board[r][c] == 'Q')
+            {
+                Console.WriteLine($"{indent}Conflict: Queen at ({r},{c}) - upper-left diagonal");
+                return false;
+            }
+        }
+
+        // Check upper-right diagonal
+        for (int r = row - 1, c = col + 1; r >= 0 && c < n; r--, c++)
+        {
+            if (board[r][c] == 'Q')
+            {
+                Console.WriteLine($"{indent}Conflict: Queen at ({r},{c}) - upper-right diagonal");
+                return false;
+            }
+        }
+
+        Console.WriteLine($"{indent}No conflicts found - position is safe");
+        return true;
+    }
+
+    private static void PrintBoard(char[][] board, string indent)
+    {
+        foreach (var row in board)
+        {
+            Console.WriteLine($"{indent}{new string(row)}");
+        }
+    }
+
+    private static List<string> BoardToStringList(char[][] board)
+    {
+        var result = new List<string>();
+        foreach (var row in board)
+        {
+            result.Add(new string(row));
+        }
+        return result;
+    }
+}
+```
+
+
+
+- Optiomize solution
+
+```csharp
+using System;
+using System.Collections.Generic;
+
+public class NQueensOptimized
+{
+    // Optimized N-Queens using sets for O(1) constraint checking
+    // Key insight: Track columns and diagonals using mathematical formulas
+
+    public static List<List<string>> SolveNQueensOptimized(int n)
+    {
+        var solutions = new List<List<string>>();
+        var board = new char[n][];
+
+        // Initialize empty board
+        for (int i = 0; i < n; i++)
+        {
+            board[i] = new char[n];
+            for (int j = 0; j < n; j++)
+            {
+                board[i][j] = '.';
+            }
+        }
+
+        // Use sets to track attacked positions - O(1) lookup
+        var columns = new HashSet<int>();           // Attacked columns
+        var diagonals1 = new HashSet<int>();        // Attacked \ diagonals (row - col)
+        var diagonals2 = new HashSet<int>();        // Attacked / diagonals (row + col)
+
+        Backtrack(board, 0, columns, diagonals1, diagonals2, solutions);
+
+        return solutions;
+    }
+
+    private static void Backtrack(
+        char[][] board,
+        int row,
+        HashSet<int> columns,
+        HashSet<int> diagonals1,    // row - col is constant for \ diagonals
+        HashSet<int> diagonals2,    // row + col is constant for / diagonals
+        List<List<string>> solutions)
+    {
+        int n = board.Length;
+
+        // BASE CASE: All queens placed
+        if (row == n)
+        {
+            solutions.Add(BoardToStringList(board));
+            return;
+        }
+
+        // Try each column in current row
+        for (int col = 0; col < n; col++)
+        {
+            int diag1 = row - col;  // Identifier for \ diagonal
+            int diag2 = row + col;  // Identifier for / diagonal
+
+            // CONSTRAINT CHECK: O(1) instead of O(N)
+            if (columns.Contains(col) ||
+                diagonals1.Contains(diag1) ||
+                diagonals2.Contains(diag2))
+            {
+                continue; // Position is under attack
+            }
+
+            // CHOOSE: Place queen and mark attacked positions
+            board[row][col] = 'Q';
+            columns.Add(col);
+            diagonals1.Add(diag1);
+            diagonals2.Add(diag2);
+
+            // EXPLORE: Move to next row
+            Backtrack(board, row + 1, columns, diagonals1, diagonals2, solutions);
+
+            // UNCHOOSE: Remove queen and unmark positions
+            board[row][col] = '.';
+            columns.Remove(col);
+            diagonals1.Remove(diag1);
+            diagonals2.Remove(diag2);
+        }
+    }
+
+    private static List<string> BoardToStringList(char[][] board)
+    {
+        var result = new List<string>();
+        foreach (var row in board)
+        {
+            result.Add(new string(row));
+        }
+        return result;
+    }
+}
+```
+
+```
+For an N×N board, understanding diagonal patterns:
+
+POSITION (row, col):
+
+\ DIAGONAL (top-left to bottom-right):
+  row - col is CONSTANT along each diagonal
+
+  Example 4×4 board (showing row-col values):
+  (0,0)=0   (0,1)=-1  (0,2)=-2  (0,3)=-3
+  (1,0)=1   (1,1)=0   (1,2)=-1  (1,3)=-2
+  (2,0)=2   (2,1)=1   (2,2)=0   (2,3)=-1
+  (3,0)=3   (3,1)=2   (3,2)=1   (3,3)=0
+
+  Range: -(n-1) to (n-1)
+
+/ DIAGONAL (top-right to bottom-left):
+  row + col is CONSTANT along each diagonal
+
+  Example 4×4 board (showing row+col values):
+  (0,0)=0   (0,1)=1   (0,2)=2   (0,3)=3
+  (1,0)=1   (1,1)=2   (1,2)=3   (1,3)=4
+  (2,0)=2   (2,1)=3   (2,2)=4   (2,3)=5
+  (3,0)=3   (3,1)=4   (3,2)=5   (3,3)=6
+
+  Range: 0 to 2(n-1)
+
+By storing these values in sets, we get O(1) diagonal checking!
+```
+
+#### Sudoku Solver
+
+```csharp
+using System;
+using System.Collections.Generic;
+
+public class SudokuSolver
+{
+    // Sudoku rules:
+    // 1. Each row must contain digits 1-9 without repetition
+    // 2. Each column must contain digits 1-9 without repetition
+    // 3. Each 3×3 box must contain digits 1-9 without repetition
+
+    public static void SolveSudoku(char[][] board)
+    {
+        Backtrack(board);
+    }
+
+    private static bool Backtrack(char[][] board)
+    {
+        // Find next empty cell
+        for (int row = 0; row < 9; row++)
+        {
+            for (int col = 0; col < 9; col++)
+            {
+                if (board[row][col] == '.')
+                {
+                    // Try digits 1-9
+                    for (char digit = '1'; digit <= '9'; digit++)
+                    {
+                        // CONSTRAINT CHECK: Can we place this digit?
+                        if (IsValid(board, row, col, digit))
+                        {
+                            // CHOOSE: Place digit
+                            board[row][col] = digit;
+
+                            // EXPLORE: Continue solving
+                            if (Backtrack(board))
+                            {
+                                return true; // Solution found
+                            }
+
+                            // UNCHOOSE: Backtrack
+                            board[row][col] = '.';
+                        }
+                    }
+
+                    return false; // No valid digit for this cell
+                }
+            }
+        }
+
+        return true; // All cells filled - solution found
+    }
+
+    private static bool IsValid(char[][] board, int row, int col, char digit)
+    {
+        // CHECK 1: Row constraint
+        for (int c = 0; c < 9; c++)
+        {
+            if (board[row][c] == digit)
+            {
+                return false; // Digit already in row
+            }
+        }
+
+        // CHECK 2: Column constraint
+        for (int r = 0; r < 9; r++)
+        {
+            if (board[r][col] == digit)
+            {
+                return false; // Digit already in column
+            }
+        }
+
+        // CHECK 3: 3×3 box constraint
+        int boxRow = (row / 3) * 3;  // Top-left row of box
+        int boxCol = (col / 3) * 3;  // Top-left col of box
+
+        for (int r = boxRow; r < boxRow + 3; r++)
+        {
+            for (int c = boxCol; c < boxCol + 3; c++)
+            {
+                if (board[r][c] == digit)
+                {
+                    return false; // Digit already in box
+                }
+            }
+        }
+
+        return true; // All constraints satisfied
+    }
+
+    // Optimized version using sets
+    public static void SolveSudokuOptimized(char[][] board)
+    {
+        // Initialize constraint tracking sets
+        var rows = new HashSet<char>[9];
+        var cols = new HashSet<char>[9];
+        var boxes = new HashSet<char>[9];
+
+        for (int i = 0; i < 9; i++)
+        {
+            rows[i] = new HashSet<char>();
+            cols[i] = new HashSet<char>();
+            boxes[i] = new HashSet<char>();
+        }
+
+        // Pre-populate sets with existing digits
+        for (int r = 0; r < 9; r++)
+        {
+            for (int c = 0; c < 9; c++)
+            {
+                if (board[r][c] != '.')
+                {
+                    char digit = board[r][c];
+                    int boxIndex = (r / 3) * 3 + (c / 3);
+
+                    rows[r].Add(digit);
+                    cols[c].Add(digit);
+                    boxes[boxIndex].Add(digit);
+                }
+            }
+        }
+
+        BacktrackOptimized(board, rows, cols, boxes);
+    }
+
+    private static bool BacktrackOptimized(char[][] board,
+                                          HashSet<char>[] rows,
+                                          HashSet<char>[] cols,
+                                          HashSet<char>[] boxes)
+    {
+        // Find next empty cell
+        for (int row = 0; row < 9; row++)
+        {
+            for (int col = 0; col < 9; col++)
+            {
+                if (board[row][col] == '.')
+                {
+                    int boxIndex = (row / 3) * 3 + (col / 3);
+
+                    // Try digits 1-9
+                    for (char digit = '1'; digit <= '9'; digit++)
+                    {
+                        // CONSTRAINT CHECK: O(1) using sets
+                        if (!rows[row].Contains(digit) &&
+                            !cols[col].Contains(digit) &&
+                            !boxes[boxIndex].Contains(digit))
+                        {
+                            // CHOOSE: Place digit and update sets
+                            board[row][col] = digit;
+                            rows[row].Add(digit);
+                            cols[col].Add(digit);
+                            boxes[boxIndex].Add(digit);
+
+                            // EXPLORE
+                            if (BacktrackOptimized(board, rows, cols, boxes))
+                            {
+                                return true;
+                            }
+
+                            // UNCHOOSE: Remove digit and update sets
+                            board[row][col] = '.';
+                            rows[row].Remove(digit);
+                            cols[col].Remove(digit);
+                            boxes[boxIndex].Remove(digit);
+                        }
+                    }
+
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+}
+```
