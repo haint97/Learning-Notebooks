@@ -3847,77 +3847,6 @@ graph TD
 - ✅ Validate inputs in service methods
 - ✅ Use mTLS for service-to-service communication
 
----
-
-## Interview Preparation
-
-### Common Interview Questions
-
-#### REST API Questions
-
-**Q1: Explain the difference between PUT and PATCH.**
-
-**Answer**:
-- **PUT**: Replaces the entire resource. Client sends complete representation. Idempotent.
-- **PATCH**: Updates specific fields. Client sends partial changes. May not be idempotent depending on implementation (JSON Merge Patch vs JSON Patch).
-
-**Example**:
-```http
-# PUT - Full replacement
-PUT /users/123
-{"id": 123, "name": "Alice", "email": "alice@example.com", "bio": "Engineer"}
-
-# PATCH - Partial update
-PATCH /users/123
-{"email": "alice.new@example.com"}
-```
-
-**Q2: How would you design pagination for a large dataset?**
-
-**Answer**: Use **cursor-based pagination** for consistency:
-```http
-GET /posts?cursor=eyJpZCI6MTIzfQ&size=20
-
-Response:
-{
-  "data": [...],
-  "pagination": {
-    "next_cursor": "eyJpZCI6MTQzfQ",
-    "has_more": true
-  }
-}
-```
-
-**Why cursor over offset**: Offset-based (`?page=2`) breaks when data changes. Cursor-based maintains consistency.
-
-**Q3: How do you handle versioning in REST APIs?**
-
-**Answer**: Use URL path versioning (`/api/v1/users`) for clarity. Support N-1 versions. Communicate deprecation 6-12 months in advance. Use sunset headers:
-```http
-Sunset: Sat, 31 Dec 2025 23:59:59 GMT
-```
-
-#### gRPC Questions
-
-**Q4: When would you choose gRPC over REST?**
-
-**Answer**:
-- **Internal microservices**: Strong typing, performance
-- **Streaming required**: Real-time data, bidirectional communication
-- **Performance critical**: Low latency (<10ms), high throughput
-- **Polyglot environments**: Auto-generated clients in 10+ languages
-- **Strong type safety**
-
-**Don't use for**: Public APIs (browser incompatibility), simple CRUD (REST overhead not justified)
-
-**Q5: Explain gRPC streaming types with examples.**
-
-**Answer**:
-1. **Unary**: Single request/response (like REST)
-2. **Server streaming**: Client sends one request, server streams multiple responses (e.g., stock price updates)
-3. **Client streaming**: Client streams multiple requests, server sends one response (e.g., uploading chunks)
-4. **Bidirectional**: Both stream simultaneously (e.g., chat application)
-
 ### System Design Scenarios
 
 #### Scenario 1: Design a RESTful API for Twitter
@@ -4102,3 +4031,85 @@ graph TD
 4. **Circuit Breaker**: Handle service failures gracefully
 
 ---
+
+
+
+
+
+---
+
+## Interview Preparation
+
+### Common Interview Questions
+
+#### REST API Questions
+
+**Q1: Explain the difference between PUT and PATCH.**
+
+**Answer**:
+- **PUT**: Replaces the entire resource. Client sends complete representation. Idempotent.
+- **PATCH**: Updates specific fields. Client sends partial changes. May not be idempotent depending on implementation (JSON Merge Patch vs JSON Patch).
+
+**Example**:
+```http
+# PUT - Full replacement
+PUT /users/123
+{"id": 123, "name": "Alice", "email": "alice@example.com", "bio": "Engineer"}
+
+# PATCH - Partial update
+PATCH /users/123
+{"email": "alice.new@example.com"}
+```
+
+**Q2: How would you design pagination for a large dataset?**
+
+**Answer**: Use **cursor-based pagination** for consistency:
+```http
+GET /posts?cursor=eyJpZCI6MTIzfQ&size=20
+
+Response:
+{
+  "data": [...],
+  "pagination": {
+    "next_cursor": "eyJpZCI6MTQzfQ",
+    "has_more": true
+  }
+}
+```
+
+**Why cursor over offset**: Offset-based (`?page=2`) breaks when data changes. Cursor-based maintains consistency.
+
+**Q3: How do you handle versioning in REST APIs?**
+
+**Answer**: Use URL path versioning (`/api/v1/users`) for clarity. Support N-1 versions. Communicate deprecation 6-12 months in advance. Use sunset headers:
+```http
+Sunset: Sat, 31 Dec 2025 23:59:59 GMT
+```
+
+#### gRPC Questions
+
+**Q4: When would you choose gRPC over REST?**
+
+**Answer**:
+- **Internal microservices**: Strong typing, performance
+- **Streaming required**: Real-time data, bidirectional communication
+- **Performance critical**: Low latency (<10ms), high throughput
+- **Polyglot environments**: Auto-generated clients in 10+ languages
+- **Strong type safety**
+
+**Don't use for**: Public APIs (browser incompatibility), simple CRUD (REST overhead not justified)
+
+**Q5: Explain gRPC streaming types with examples.**
+
+**Answer**:
+1. **Unary**: Single request/response (like REST)
+2. **Server streaming**: Client sends one request, server streams multiple responses (e.g., stock price updates)
+3. **Client streaming**: Client streams multiple requests, server sends one response (e.g., uploading chunks)
+4. **Bidirectional**: Both stream simultaneously (e.g., chat application)
+
+**Q6: What is the difference between REST and HTTP?**
+**Answer**:
+- **HTTP** is a protocol used for communication between clients and servers. It defines methods (GET, POST, etc.) and status codes (200, 404, etc.).
+- **REST** is an architectural style that uses HTTP as its underlying protocol. REST defines constraints like statelessness, resource-based URIs, and standard methods to create scalable web services.
+
+REST is a web architecture style that proposes some constraints that should be used to design web or mobile applications. However, HTTP is the protocol, or, in simple words, a method that enables us to achieve the constraints proposed by REST. Although HTTP was designed earlier than REST, fortunately, it has all the features that can be utilized to make the World Wide Web conform to the REST constraints. Therefore, HTTP is widely adopted in this regard.
