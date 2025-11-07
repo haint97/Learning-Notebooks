@@ -45,6 +45,13 @@ This comprehensive guide explores the fundamental API architecture styles that p
 
 HTTP (Hypertext Transfer Protocol) is the foundation of data communication on the web. It's a stateless (A stateless protocol is one in which each request is considered independent of any other request. This makes it simple to implement.), request-response protocol that enables client-server interactions.
 
+### HTTP request - response structure
+
+![alt text](api-images/http-request-structure.png)
+
+![alt text](api-images/http-response-structure.png)
+
+
 ### Evolution of HTTP
 
 | Version   | Release Year | Methods Supported                               | Support for Headers | Connection Nature                  | Transport Protocol | Content Types Supported                     | Caching Support                          | Key Features                                                                                                                                                                                                                              | Drawbacks                                                                                   |
