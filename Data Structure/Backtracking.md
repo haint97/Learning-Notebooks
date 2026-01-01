@@ -1769,3 +1769,59 @@ public class SudokuSolver
     }
 }
 ```
+
+## Pattern Recognition
+```csharp
+public static class DuplicateHandlingPatterns
+{
+    // PATTERN 1: Subsets with duplicates
+    public static void SubsetsPattern(int[] nums, int start)
+    {
+        // Key: Sort first, then skip consecutive duplicates
+        // Skip condition: i > start && nums[i] == nums[i-1]
+
+        for (int i = start; i < nums.Length; i++)
+        {
+            if (i > start && nums[i] == nums[i - 1])
+                continue; // Skip duplicate
+
+            // Process nums[i]...
+        }
+    }
+
+    // PATTERN 2: Combinations with duplicates
+    public static void CombinationsPattern(int[] nums, int k, int start)
+    {
+        // Same duplicate handling as subsets
+        // Plus size constraint
+
+        for (int i = start; i < nums.Length; i++)
+        {
+            if (i > start && nums[i] == nums[i - 1])
+                continue; // Skip duplicate
+
+            // Process nums[i]...
+        }
+    }
+
+    // PATTERN 3: Permutations with duplicates
+    public static void PermutationsPattern(int[] nums, bool[] used)
+    {
+        // Different! Need used array AND duplicate check
+
+        for (int i = 0; i < nums.Length; i++)
+        {
+            if (used[i])
+                continue;
+
+            // Skip if same value and previous occurrence not used
+            if (i > 0 && nums[i] == nums[i - 1] && !used[i - 1])
+                continue; // Skip duplicate
+
+            used[i] = true;
+            // Process nums[i]...
+            used[i] = false;
+        }
+    }
+}
+```

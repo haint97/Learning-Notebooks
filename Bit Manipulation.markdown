@@ -15,14 +15,26 @@ This document focuses on C# bitwise operators, their applications, and interview
 ## Bitwise Operators
 C# supports six bitwise operators for integer types (`int`, `uint`, `byte`, etc.). Below is a summary:
 
-| Operator | Name                | Description                                                                 | Example (a=47, b=19)                     |
-|----------|---------------------|-----------------------------------------------------------------------------|------------------------------------------|
-| `&`      | AND                 | Sets bit to 1 if both bits are 1. Used for masking or checking bits.         | `47 & 19` = `0b00101111 & 0b00010011` = `3` |
-| `\|`     | OR                  | Sets bit to 1 if at least one bit is 1. Used to set or combine bits.        | `47 \| 19` = `0b00101111 \| 0b00010011` = `63` |
-| `~`      | NOT                 | Inverts all bits (0 to 1, 1 to 0). Affected by signed/unsigned types.        | `~47` = `-48` (32-bit int)              |
-| `^`      | XOR                 | Sets bit to 1 if bits differ. Used for toggling or detecting differences.    | `47 ^ 19` = `0b00101111 ^ 0b00010011` = `60` |
-| `<<`     | Left Shift          | Shifts bits left, filling right with 0s. Multiplies by \(2^n\).             | `47 << 2` = `188`                       |
-| `>>`     | Right Shift         | Shifts bits right. For `int`, sign bit is preserved; for `uint`, 0s are used. | `47 >> 2` = `11`                        |
+| Operator | Name        | Description                                                                   | Example (a=47, b=19)                           |
+| -------- | ----------- | ----------------------------------------------------------------------------- | ---------------------------------------------- |
+| `&`      | AND         | Sets bit to 1 if both bits are 1. Used for masking or checking bits.          | `47 & 19` = `0b00101111 & 0b00010011` = `3`    |
+| `\|`     | OR          | Sets bit to 1 if at least one bit is 1. Used to set or combine bits.          | `47 \| 19` = `0b00101111 \| 0b00010011` = `63` |
+| `~`      | NOT         | Inverts all bits (0 to 1, 1 to 0). Affected by signed/unsigned types.         | `~47` = `-48` (32-bit int)                     |
+| `^`      | XOR         | Sets bit to 1 if bits differ. Used for toggling or detecting differences.     | `47 ^ 19` = `0b00101111 ^ 0b00010011` = `60`   |
+| `<<`     | Left Shift  | Shifts bits left, filling right with 0s. Multiplies by \(2^n\).               | `47 << 2` = `188`                              |
+| `>>`     | Right Shift | Shifts bits right. For `int`, sign bit is preserved; for `uint`, 0s are used. | `47 >> 2` = `11`                               |
+
+• | with 1 is useful for turning select bits on
+
+• & with 0 is useful for turning select bits off
+
+• | is useful for taking the union of bits
+
+• & is useful for taking the intersection of bits
+
+• ^ is useful for flipping isolated bits
+
+• ~ is useful for flipping all bits
 
 ## Operations
 
@@ -45,9 +57,9 @@ Shifts bits right by \(n\) positions. For `int`, it’s an **arithmetic shift** 
   Console.WriteLine(neg >> 1); // -4 (sign bit preserved)
   ```
 - **Truth Table** (for single bit):
-  | Input | Shift | Output |
-  |-------|-------|--------|
-  | 0     | >> 1  | 0      |
+  | Input | Shift | Output                              |
+  | ----- | ----- | ----------------------------------- |
+  | 0     | >> 1  | 0                                   |
   | 1     | >> 1  | 0 (unsigned) / 1 (signed, negative) |
 
 ### Left Shift (`<<`)
@@ -65,9 +77,9 @@ Shifts bits left by \(n\) positions, filling right with 0s. Equivalent to multip
   Console.WriteLine(x); // -2147483648 (overflow in signed int)
   ```
 - **Truth Table** (for single bit):
-  | Input | Shift | Output |
-  |-------|-------|--------|
-  | 0     | << 1  | 0      |
+  | Input | Shift | Output                    |
+  | ----- | ----- | ------------------------- |
+  | 0     | << 1  | 0                         |
   | 1     | << 1  | 0 (shifted out, 0 filled) |
 
 ### AND (`&`)
@@ -95,7 +107,7 @@ Sets a bit to 1 only if both corresponding bits are 1.
      ```
 - **Truth Table**:
   | a (0/1) | b (0/1) | a & b | a (Bool) | b (Bool) | a & b (Bool) |
-  |---------|---------|-------|----------|----------|--------------|
+  | ------- | ------- | ----- | -------- | -------- | ------------ |
   | 0       | 0       | 0     | False    | False    | False        |
   | 0       | 1       | 0     | False    | True     | False        |
   | 1       | 0       | 0     | True     | False    | False        |
@@ -119,7 +131,7 @@ Sets a bit to 1 if at least one corresponding bit is 1.
      ```
 - **Truth Table**:
   | a (0/1) | b (0/1) | a \| b | a (Bool) | b (Bool) | a \| b (Bool) |
-  |---------|---------|--------|----------|----------|---------------|
+  | ------- | ------- | ------ | -------- | -------- | ------------- |
   | 0       | 0       | 0      | False    | False    | False         |
   | 0       | 1       | 1      | False    | True     | True          |
   | 1       | 0       | 1      | True     | False    | True          |
@@ -150,7 +162,7 @@ Sets a bit to 1 if the bits differ, 0 if they’re the same.
      ```
 - **Truth Table**:
   | a (0/1) | b (0/1) | a ^ b | a (Bool) | b (Bool) | a ^ b (Bool) |
-  |---------|---------|-------|----------|----------|--------------|
+  | ------- | ------- | ----- | -------- | -------- | ------------ |
   | 0       | 0       | 0     | False    | False    | False        |
   | 0       | 1       | 1     | False    | True     | True         |
   | 1       | 0       | 1     | True     | False    | True         |
@@ -176,21 +188,21 @@ Inverts all bits. For `int`, this affects the sign bit, producing a negative num
   ```
 - **Truth Table**:
   | a (0/1) | ~a (0/1) |
-  |---------|----------|
+  | ------- | -------- |
   | 0       | 1        |
   | 1       | 0        |
 
 ## Applications
 Bitwise operators are widely used in C# for:
 
-| Operation | Use Case | Example |
-|-----------|----------|---------|
-| `&`       | Test bits (e.g., check flags, even/odd) | Check if a permission is set. |
-| `\|`      | Set bits (e.g., combine flags) | Grant multiple permissions. |
-| `^`       | Toggle bits, swap values, detect differences | Toggle a flag or swap variables. |
-| `~`       | Invert bits, clear bits with AND | Clear specific flags. |
-| `<<`      | Multiply by \(2^n\), pack data | Scale numbers or encode RGB colors. |
-| `>>`      | Divide by \(2^n\), extract bits | Parse network addresses or decode data. |
+| Operation | Use Case                                     | Example                                 |
+| --------- | -------------------------------------------- | --------------------------------------- |
+| `&`       | Test bits (e.g., check flags, even/odd)      | Check if a permission is set.           |
+| `\|`      | Set bits (e.g., combine flags)               | Grant multiple permissions.             |
+| `^`       | Toggle bits, swap values, detect differences | Toggle a flag or swap variables.        |
+| `~`       | Invert bits, clear bits with AND             | Clear specific flags.                   |
+| `<<`      | Multiply by \(2^n\), pack data               | Scale numbers or encode RGB colors.     |
+| `>>`      | Divide by \(2^n\), extract bits              | Parse network addresses or decode data. |
 
 ### C# Example: Managing Permissions
 ```csharp
