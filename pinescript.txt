@@ -1,0 +1,1317 @@
+//@version=5
+indicator("MacroAcademic - VN Economy Engine v5.0 [Enhanced]", shorttitle="MacroAcademic - VN Economy v5", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=5000, precision=4)
+
+// =====================================================
+// A) CONTROLS
+// =====================================================
+panelOption = input.string(defval = "Inflation", title = "Panel đang xem", options = ["Inflation", "Interbank - Policy Rate", "GDP", "Inflation Driver Index", "VN Yield Curve", "RiskScore", "Credit Growth", "US Yield Curve", "Long-Term Forecast", "Market Regime Map", "Valuation & Divergence"], tooltip = "Chọn panel để hiển thị | Mỗi instance script = 1 panel")
+
+panel = switch panelOption
+    "Inflation"                    => 1
+    "Interbank - Policy Rate"      => 2
+    "GDP"                          => 3
+    "Inflation Driver Index"       => 4
+    "VN Yield Curve"               => 5
+    "RiskScore"                    => 6
+    "Credit Growth"                => 7
+    "US Yield Curve"               => 8
+    "Long-Term Forecast"           => 9
+    "Market Regime Map"            => 10
+    "Valuation & Divergence"       => 11
+    => 1
+
+robustMode  = input.string("Shock-sensitive", "Robust mode", options=["Shock-sensitive","Fully-robust MAD"])
+threshold_mode = input.string("Static", "Che do nguong", options = ["Static", "Dynamic (z-score)", "Percentile-based"])
+calibration_preset = input.string("Balanced", "Calibration Preset", options=["Aggressive", "Balanced", "Conservative"], tooltip="Aggressive: nhạy hơn (90/10), Balanced: 85/15, Conservative: 80/20")
+
+useDrivers     = input.bool(true,  "Bat Drivers (PPI+FX+Oil)")
+useYieldCurve  = input.bool(true,  "Bat Yield curve (VN10Y-VN02Y)")
+useExternalBOT = input.bool(false, "Them BOT (can can thuong mai)")
+useCredit      = input.bool(true,  "Bat Credit Growth (M2)")
+useDXY         = input.bool(true,  "Bat DXY (Suc manh USD)")
+useValuation   = input.bool(true,  "Bat Valuation Check (MA200)")
+
+tblPosOpt   = input.string("Top Right", "Vi tri bang", options=["Top Right","Top Left","Bottom Right","Bottom Left"])
+fontOpt     = input.string("Small", "Co chu bang", options=["Tiny","Small","Normal"])
+
+pctlColorOn     = input.bool(true, "To mau PCTL")
+riskColorOn     = input.bool(true, "To mau Risk")
+
+// =====================================================
+// B) SYMBOLS (Editable)
+// =====================================================
+sym_infl  = input.symbol("ECONOMICS:VNIRYY",  "Lam phat YoY (Thang)")
+sym_pol   = input.symbol("ECONOMICS:VNINTR",  "Lai suat dieu hanh (Ngay)")
+sym_ib    = input.symbol("ECONOMICS:VNINBR",  "Lai suat lien ngan hang (Ngay)")
+sym_gdp   = input.symbol("ECONOMICS:VNGDPYY", "GDP YoY (Quy)")
+sym_m2    = input.symbol("ECONOMICS:VNM2",    "Cung tien M2 (Thang)")
+
+sym_ppi   = input.symbol("ECONOMICS:VNPPI",   "PPI (Quy)")
+sym_fx    = input.symbol("FX_IDC:USDVND",     "USDVND (Ngay)")
+sym_oil   = input.symbol("TVC:UKOIL",         "Dau Brent proxy (Ngay)")
+sym_dxy   = input.symbol("TVC:DXY",           "DXY Index (Ngay)")
+
+sym_vn10y = input.symbol("TVC:VN10Y",         "VN 10Y (Ngay)")
+sym_vn02y = input.symbol("TVC:VN02Y",         "VN 2Y (Ngay)")
+
+sym_bot   = input.symbol("ECONOMICS:VNBOT",   "BOT (Thang)")
+sym_usyc  = input.symbol("T10Y2Y",            "US 10Y-2Y (Ngay)")
+
+sym_us10y = input.symbol("US10Y", "US 10Y")
+sym_us02y = input.symbol("US02Y", "US 2Y")
+sym_vnindex = input.symbol("VNINDEX", "VNINDEX")
+
+// =====================================================
+// C) PARAMETERS - RECALIBRATED
+// =====================================================
+infl_trend_len_m = input.int(24, "Trend lam phat (thang)", minval=6, maxval=120)
+infl_z_len_m     = input.int(60, "Lookback (thang)", minval=24, maxval=240)
+infl_clip        = input.float(2.5, "Clip (infl)", minval=1.5, maxval=6.0, step=0.1)
+
+ewma_lambda      = input.float(0.30, "EWMA lambda", minval=0.05, maxval=0.95, step=0.01)
+ar1_len_m        = input.int(60, "AR1 lookback (thang)", minval=24, maxval=240)
+w_trend          = input.float(0.40, "Trong so Trend", minval=0.0, maxval=1.0, step=0.05)
+w_ewma           = input.float(0.30, "Trong so EWMA",  minval=0.0, maxval=1.0, step=0.05)
+w_ar1            = input.float(0.30, "Trong so AR1",   minval=0.0, maxval=1.0, step=0.05)
+
+rreal_ema_len_m  = input.int(12, "EMA lai thuc (thang)", minval=3, maxval=60)
+rate_z_len_m     = input.int(60, "Lookback (rate)", minval=24, maxval=240)
+rate_clip        = input.float(2.5, "Clip (rate)", minval=1.5, maxval=6.0, step=0.1)
+
+gdp_trend_len_q  = input.int(12, "Trend GDP (quy)", minval=4, maxval=40)
+gdp_z_len_q      = input.int(40, "Lookback GDP (quy)", minval=16, maxval=120)
+gdp_clip         = input.float(2.5, "Clip (GDP)", minval=1.5, maxval=6.0, step=0.1)
+
+credit_trend_len_m = input.int(24, "Trend Credit (thang)", minval=6, maxval=120)
+credit_z_len_m     = input.int(60, "Lookback Credit (thang)", minval=24, maxval=240)
+
+drv_z_len_m      = input.int(60, "Lookback drivers", minval=24, maxval=240)
+drv_clip         = input.float(2.5, "Clip (drivers)", minval=1.5, maxval=6.0, step=0.1)
+ppi_trend_len_q  = input.int(12, "Trend PPI (quy)", minval=4, maxval=40)
+ppi_z_len_q      = input.int(40, "Lookback PPI (quy)", minval=16, maxval=120)
+
+pi_target        = input.float(4.0, "Muc tieu lam phat (%)", minval=0.0, maxval=15.0, step=0.1)
+r_star           = input.float(1.0, "r* (%)", minval=-5.0, maxval=10.0, step=0.1)
+phi_pi           = input.float(0.5, "He so lam phat", minval=0.0, maxval=2.0, step=0.05)
+phi_y            = input.float(0.5, "He so GDP gap", minval=0.0, maxval=2.0, step=0.05)
+policy_z_len_m   = input.int(60, "Lookback policy gap", minval=24, maxval=240)
+
+// RECALIBRATED WEIGHTS
+w_stress    = input.float(2.5, "Trong so Stress", minval=0, maxval=5, step=0.1)
+w_curve     = input.float(2.0, "Trong so Yield curve", minval=0, maxval=5, step=0.1)
+w_growth    = input.float(1.5, "Trong so Growth (GDP)", minval=0, maxval=5, step=0.1)
+w_inflation = input.float(1.5, "Trong so Inflation", minval=0, maxval=5, step=0.1)
+w_intl      = input.float(1.5, "Trong so Intl Yield Diff", minval=0, maxval=5, step=0.1)
+w_spread    = input.float(1.5, "Trong so Long-Short Spread", minval=0, maxval=5, step=0.1)
+w_credit    = input.float(1.0, "Trong so Credit", minval=0, maxval=5, step=0.1)
+w_dxy       = input.float(1.0, "Trong so DXY", minval=0, maxval=5, step=0.1)
+w_drv       = input.float(1.0, "Trong so Drivers", minval=0, maxval=5, step=0.1)
+
+percentile_lookback    = input.int(504, "Chu ky phan phoi (bars)", minval=100, maxval=2000)
+clip_multiplier        = input.float(3.0, "Clip outliers (std)", minval=1.5, maxval=4.0, step=0.1)
+risk_forecast_lookback = input.int(252, "Risk forecast lookback")
+
+ma200_len           = input.int(200, "MA200 Length", minval=50, maxval=500)
+valuation_discount  = input.float(0.80, "Valuation Discount Threshold", minval=0.5, maxval=1.0, step=0.05, tooltip="Giá < MA200 * threshold = rẻ")
+divergence_lookback = input.int(60, "Divergence Lookback", minval=20, maxval=200)
+dxy_threshold = input.float(105.0, "DXY Alert Threshold", minval=90, maxval=120, step=0.5)
+
+// =====================================================
+// D) WORDING DICTIONARY
+// =====================================================
+const string WD_HDR_DO         = "NEN LAM (NGAN GON)"
+const string WD_HDR_WATCH      = "KHI NAO NEN CHU Y"
+const string WD_HDR_DEBUG      = "DEBUG (NGAN GON)"
+
+const string WD_COL_METRIC     = "Chi tieu"
+const string WD_COL_VALUE      = "Gia tri"
+const string WD_COL_PCTL       = "PCTL"
+const string WD_COL_MEANING    = "Y nghia"
+
+const string WD_INFL           = "Lam phat"
+const string WD_FORECAST       = "Du bao"
+const string WD_VS_TREND       = "So voi trend"
+const string WD_MOM            = "Dong luc"
+const string WD_SURPRISE       = "Lech du bao"
+const string WD_TIGHT          = "Ap luc lai suat"
+const string WD_POLICY         = "Lai suat dieu hanh"
+const string WD_INTERBANK      = "Lien ngan hang"
+const string WD_REALRATE       = "Lai thuc"
+const string WD_POLICYGAP      = "Policy gap"
+const string WD_GDP            = "GDP"
+const string WD_PHASE          = "Pha"
+const string WD_COST           = "Chi phi"
+const string WD_YC             = "Yield curve"
+const string WD_SLOPE          = "Do doc (10Y-2Y)"
+const string WD_RISK           = "Rui ro"
+const string WD_ACCURACY       = "Do tin (du bao)"
+
+const string WD_REGIME         = "Che do thi truong"
+const string WD_RISK_FORECAST  = "Du bao rui ro"
+const string WD_BUCKET_GUIDE   = "Huong dan Bucket"
+const string WD_LAYER1         = "Layer 1: Funding/Liquidity"
+const string WD_LAYER2         = "Layer 2: Cycle/Growth"
+const string WD_LAYER3         = "Layer 3: External/Inflation"
+const string WD_SCENARIO       = "Kich ban vi mo"
+
+const string WD_STATE_NA       = "Chua du du lieu"
+const string WD_STATE_FLAT     = "Di ngang"
+const string WD_STATE_HOT      = "Co dau hieu nong lai"
+const string WD_STATE_COOL     = "Dang ha nhiet"
+const string WD_RATE_TIGHT     = "Lai suat: dang that"
+const string WD_RATE_EASY      = "Lai suat: dang de"
+const string WD_RATE_NEUTRAL   = "Lai suat: trung tinh"
+const string WD_RATE_UNKNOWN   = "Lai suat: chua ro"
+const string WD_PHASE_EXPAND   = "Pha: mo rong"
+const string WD_PHASE_STABLE   = "Pha: on dinh"
+const string WD_PHASE_SLOW     = "Pha: cham lai"
+const string WD_COST_UP        = "Chi phi: dang tang"
+const string WD_COST_DOWN      = "Chi phi: dang giam"
+const string WD_COST_NEUTRAL   = "Chi phi: trung tinh"
+const string WD_COST_OFF       = "Chi phi: OFF"
+const string WD_YC_INV         = "YC: dao nguoc"
+const string WD_YC_NORM        = "YC: binh thuong"
+const string WD_YC_OFF         = "YC: OFF"
+const string WD_EVAL_OK        = "Tin hieu: on dinh"
+const string WD_EVAL_WATCH     = "Tin hieu: de doi"
+const string WD_EVAL_OFF       = "Eval: OFF"
+const string WD_HINT_PCTL_DASH = "Neu PCTL '-' thi can them lich su (>=24-60 thang)."
+const string WD_KXH            = "NA"
+
+// =====================================================
+// E) HELPERS
+// =====================================================
+f_round(float x, int d) =>
+    float m = math.pow(10.0, d)
+    math.round(x * m) / m
+
+f_fmt(float x, int d) =>
+    string s = "-"
+    if not na(x)
+        s := str.tostring(f_round(x, d))
+    s
+
+f_fmt_pctl(float x) =>
+    na(x) ? "-" : str.tostring(int(math.round(x)))
+
+f_sec(string sym, string tf, float expr) =>
+    request.security(sym, tf, expr, barmerge.gaps_off, barmerge.lookahead_off)
+
+f_cov(float x, float y, int length) =>
+    float mx = ta.sma(x, length)
+    float my = ta.sma(y, length)
+    ta.sma((x - mx) * (y - my), length)
+
+f_var(float x, int length) =>
+    float mx = ta.sma(x, length)
+    ta.sma((x - mx) * (x - mx), length)
+
+f_rollsum(float src, int length) =>
+    float s = 0.0
+    for i = 0 to length - 1
+        s += nz(src[i])
+    s
+
+f_winsor_z(float src, int length, float clip_mult) =>
+    float m  = ta.sma(src, length)
+    float sd = ta.stdev(src, length)
+    float hi = m + clip_mult * sd
+    float lo = m - clip_mult * sd
+    float clipped = src
+    if not na(sd)
+        clipped := math.max(lo, math.min(hi, src))
+    float cm  = ta.sma(clipped, length)
+    float csd = ta.stdev(clipped, length)
+    float z = 0.0
+    if csd > 0
+        z := (src - cm) / csd
+    z
+
+f_mad_z(float src, int length) =>
+    float med   = ta.percentile_nearest_rank(src, length, 50)
+    float mad   = ta.percentile_nearest_rank(math.abs(src - med), length, 50)
+    float denom = 1.4826 * mad
+    float z = 0.0
+    if denom > 0
+        z := (src - med) / denom
+    z
+
+f_z(float src, int length, float clip_mult) =>
+    robustMode == "Fully-robust MAD" ? f_mad_z(src, length) : f_winsor_z(src, length, clip_mult)
+
+f_robust_zscore(float src, int length, float clip_multiplier) =>
+    float _mean = ta.sma(src, length)
+    float _std  = ta.stdev(src, length)
+    float upper = _mean + clip_multiplier * _std
+    float lower = _mean - clip_multiplier * _std
+    float clipped = math.max(lower, math.min(upper, src))
+    float c_mean = ta.sma(clipped, length)
+    float c_std  = ta.stdev(clipped, length)
+    c_std > 0 ? (clipped - c_mean) / c_std : 0.0
+
+f_percentile_threshold(float src, int length, float percentile_val) =>
+    ta.percentile_linear_interpolation(src, length, percentile_val)
+
+f_check_percentile_warning(float src, int length, float percentile_val, bool is_low_bad) =>
+    float thresh = f_percentile_threshold(src, length, percentile_val)
+    is_low_bad ? src <= thresh : src >= thresh
+
+f_bucket(float p) =>
+    string b = "B2"
+    if not na(p)
+        if p < 20
+            b := "B0"
+        else if p < 40
+            b := "B1"
+        else if p < 60
+            b := "B2"
+        else if p < 80
+            b := "B3"
+        else
+            b := "B4"
+    b
+
+f_bucket_from_risk(float risk) =>
+    int b = na
+    if not na(risk)
+        b := risk < 20 ? 0 : risk < 40 ? 1 : risk < 60 ? 2 : risk < 80 ? 3 : 4
+    b
+
+f_bucket_label(int b) =>
+    b == 0 ? "B0 (0–20)" : b == 1 ? "B1 (20–40)" : b == 2 ? "B2 (40–60)" : b == 3 ? "B3 (60–80)" : b == 4 ? "B4 (80–100)" : "NA"
+
+f_arr_push_float(float[] arr, float val, int maxlen) =>
+    if not na(val)
+        array.push(arr, val)
+        if array.size(arr) > maxlen
+            array.shift(arr)
+
+f_arr_pctl(float[] arr, float val) =>
+    float p = na
+    int n = array.size(arr)
+    if n > 0 and not na(val)
+        int cnt = 0
+        for i = 0 to n - 1
+            float x = array.get(arr, i)
+            if not na(x) and x <= val
+                cnt += 1
+        p := 100.0 * cnt / n
+    p
+
+f_pctl_bg_dir(float p, bool highIsBad) =>
+    color bg = color.new(color.black, 85)
+    if na(p)
+        bg := color.new(color.black, 85)
+    else
+        bool hi = p >= 80
+        bool midhi = p >= 60 and p < 80
+        bool midlo = p >= 40 and p < 60
+        bool lo = p >= 20 and p < 40
+        if highIsBad
+            bg := hi ? color.new(color.red, 65) : midhi ? color.new(color.orange, 70) : midlo ? color.new(color.black, 85) : lo ? color.new(color.green, 82) : color.new(color.green, 68)
+        else
+            bg := hi ? color.new(color.green, 68) :  midhi ? color.new(color.green, 82) :  midlo ? color.new(color.black, 85) : lo ? color.new(color.orange, 70) : color.new(color.red, 65)
+    bg
+
+f_bucket_bg(int bucket) =>
+    color bg = color.new(color.black, 85)
+    if not riskColorOn
+        bg := color.new(color.black, 0)
+    else
+        bg := bucket == 4 ? color.new(color.red, 60) : bucket == 3 ? color.new(color.orange, 65) : bucket == 2 ? color.new(color.black, 85) : bucket == 1 ? color.new(color.green, 82) : color.new(color.green, 68)
+    bg
+
+f_risk_text(int bucket) =>
+    bucket == 4 ? "Rui ro rat cao" : bucket == 3 ? "Rui ro cao" : bucket == 2 ? "Rui ro vua" : bucket == 1 ? "Rui ro thap" : "Rui ro rat thap"
+
+f_pctl_text(float p, bool ranked) =>
+    ranked ? f_fmt_pctl(p) : WD_KXH
+
+f_performance_accuracy(float forecast, float actual, int lookback) =>
+    var float[] errors = array.new_float()
+    float error = math.abs(actual - forecast)
+    array.push(errors, error)
+    if array.size(errors) > lookback
+        array.shift(errors)
+    float mae = array.avg(errors)
+    float accuracy = mae < 5 ? 95.0 : mae < 10 ? 85.0 : mae < 15 ? 75.0 : 60.0
+    accuracy
+
+// =====================================================
+// F) EXPECTATION ENSEMBLE (Monthly)
+// =====================================================
+f_pi_trend(float src) => ta.ema(src, infl_trend_len_m)
+
+f_pi_ewma(float src) =>
+    var float ew = na
+    if na(ew[1])
+        ew := src
+    else
+        ew := ewma_lambda * src + (1.0 - ewma_lambda) * ew[1]
+    ew
+
+f_pi_ar1_expect(float src) =>
+    float y    = src[1]
+    float x    = src[2]
+    float cov  = f_cov(y, x, ar1_len_m)
+    float varx = f_var(x, ar1_len_m)
+    float beta = varx > 0 ? cov / varx : 0.0
+    float my = ta.sma(y, ar1_len_m)
+    float mx = ta.sma(x, ar1_len_m)
+    float a  = my - beta * mx
+    a + beta * y
+
+f_pi_ensemble_expect(float src) =>
+    float tr = f_pi_trend(src)
+    float ew = f_pi_ewma(src)
+    float ar = f_pi_ar1_expect(src)
+    float wsum = w_trend + w_ewma + w_ar1
+    float wt = wsum > 0 ? w_trend / wsum : 1.0
+    float we = wsum > 0 ? w_ewma  / wsum : 0.0
+    float wa = wsum > 0 ? w_ar1   / wsum : 0.0
+    wt * tr[1] + we * ew[1] + wa * ar
+
+float pi_m       = f_sec(sym_infl, "M", close)
+float pi_trend_m = f_sec(sym_infl, "M", f_pi_trend(close))
+float pi_gap_m   = pi_m - pi_trend_m
+float dpi_m      = f_sec(sym_infl, "M", close - close[1])
+float pi_e_m     = f_sec(sym_infl, "M", f_pi_ensemble_expect(close))
+float surprise_m = f_sec(sym_infl, "M", close - f_pi_ensemble_expect(close))
+
+// =====================================================
+// G) CREDIT GROWTH (M2)
+// =====================================================
+float m2_m = na
+float m2_trend_m = na
+float m2_gap_m = na
+float m2_yoy_m = na
+float credit_idx = na
+
+if useCredit
+    m2_m := f_sec(sym_m2, "M", close)
+    m2_trend_m := f_sec(sym_m2, "M", ta.ema(close, credit_trend_len_m))
+    m2_gap_m := m2_m - m2_trend_m
+    m2_yoy_m := f_sec(sym_m2, "M", (close / close[12] - 1) * 100)
+    credit_idx := f_z(m2_gap_m, credit_z_len_m, 2.5)
+
+// =====================================================
+// H) DXY & FX STRESS
+// =====================================================
+float dxy_m = na
+float dxy_stress = na
+
+if useDXY
+    dxy_m := f_sec(sym_dxy, "M", close)
+    dxy_stress := dxy_m > dxy_threshold ? 1.0 : 0.0
+
+// =====================================================
+// I) DRIVERS + BOT
+// =====================================================
+float ppi_q       = na
+float ppi_trend_q = na
+float ppi_gap_q   = na
+float fx_mom_m    = na
+float oil_mom_m   = na
+float z_ppi_gap   = na
+float z_fx_mom    = na
+float z_oil_mom   = na
+float IDI         = na
+float oil_price_m = na
+float oil_inverse = na
+float fx_stress   = na
+
+if useDrivers
+    ppi_q       := f_sec(sym_ppi, "3M", close)
+    ppi_trend_q := f_sec(sym_ppi, "3M", ta.ema(close, ppi_trend_len_q))
+    ppi_gap_q   := ppi_q - ppi_trend_q
+    fx_mom_m    := f_sec(sym_fx,  "M", math.log(close / close[1]))
+    oil_mom_m   := f_sec(sym_oil, "M", math.log(close / close[1]))
+
+    if threshold_mode == "Dynamic (z-score)"
+        z_ppi_gap := f_robust_zscore(ppi_gap_q, ppi_z_len_q, clip_multiplier)
+        z_fx_mom  := f_robust_zscore(fx_mom_m, drv_z_len_m, clip_multiplier)
+        z_oil_mom := f_robust_zscore(oil_mom_m, drv_z_len_m, clip_multiplier)
+    else if threshold_mode == "Percentile-based"
+        z_ppi_gap := ppi_gap_q >= f_percentile_threshold(ppi_gap_q, percentile_lookback, 85) ? 1.0 : 0.0
+        z_fx_mom  := fx_mom_m  >= f_percentile_threshold(fx_mom_m,  percentile_lookback, 85) ? 1.0 : 0.0
+        z_oil_mom := oil_mom_m >= f_percentile_threshold(oil_mom_m, percentile_lookback, 85) ? 1.0 : 0.0
+    else
+        z_ppi_gap := f_z(ppi_gap_q, ppi_z_len_q, drv_clip)
+        z_fx_mom  := f_z(fx_mom_m,  drv_z_len_m, drv_clip)
+        z_oil_mom := f_z(oil_mom_m, drv_z_len_m, drv_clip)
+
+    IDI := 0.5 * z_ppi_gap + 0.3 * z_fx_mom + 0.2 * z_oil_mom
+
+    oil_price_m := f_sec(sym_oil, "M", close)
+    oil_inverse := oil_price_m > 0 ? 1.0 / oil_price_m : na
+    fx_stress   := ta.change(f_sec(sym_fx, "M", close), 20)
+
+float bot_m = na
+float bot_z = na
+if useExternalBOT
+    bot_m := f_sec(sym_bot, "M", close)
+    bot_z := f_z(bot_m, 60, 2.5)
+
+// =====================================================
+// J) RATES
+// =====================================================
+float i_policy_m = f_sec(sym_pol, "M", close)
+float i_ib_m     = f_sec(sym_ib,  "M", close)
+float di_ib_m    = f_sec(sym_ib,  "M", close - close[1])
+
+float r_real_m   = i_policy_m - pi_e_m
+bool  isNewMonth = timeframe.change("M")
+float alpha_m    = 2.0 / (rreal_ema_len_m + 1.0)
+
+var float rreal_ema_m = na
+if isNewMonth
+    rreal_ema_m := na(rreal_ema_m) ? r_real_m : alpha_m * r_real_m + (1.0 - alpha_m) * rreal_ema_m
+
+float r_real_gap_m = r_real_m - rreal_ema_m
+float tight_idx = f_z(r_real_gap_m, rate_z_len_m, rate_clip) + 0.5 * f_z(di_ib_m, rate_z_len_m, rate_clip)
+
+// =====================================================
+// K) GDP
+// =====================================================
+float gdp_q       = f_sec(sym_gdp, "3M", close)
+float gdp_trend_q = f_sec(sym_gdp, "3M", ta.ema(close, gdp_trend_len_q))
+float gdp_gap_q   = gdp_q - gdp_trend_q
+float grow_idx    = f_z(gdp_gap_q, gdp_z_len_q, gdp_clip)
+
+// =====================================================
+// L) TAYLOR GAP
+// =====================================================
+float i_implied  = r_star + pi_m + phi_pi * (pi_m - pi_target) + phi_y * gdp_gap_q
+float policy_gap = i_policy_m - i_implied
+
+// =====================================================
+// M) VN YIELD CURVE
+// =====================================================
+float vn10y_m = na
+float vn02y_m = na
+float yc_slope_m = na
+float yc_idx = na
+
+if useYieldCurve
+    vn10y_m := f_sec(sym_vn10y, "M", close)
+    vn02y_m := f_sec(sym_vn02y, "M", close)
+    yc_slope_m := vn10y_m - vn02y_m
+    yc_idx := f_z(yc_slope_m, 60, 2.5)
+
+float us10y_m = f_sec(sym_us10y, "M", close)
+float us02y_m = f_sec(sym_us02y, "M", close)
+float us_slope_m = us10y_m - us02y_m
+float us_idx = f_z(us_slope_m, 60, 2.5)
+
+float intl_yield_diff = na
+float long_short_spread = na
+float intl_idx = na
+float spread_idx = na
+
+if useYieldCurve
+    intl_yield_diff := vn10y_m - us10y_m
+    long_short_spread := vn10y_m - i_policy_m
+    intl_idx := f_z(intl_yield_diff, 60, 2.5)
+    spread_idx := f_z(long_short_spread, 60, 2.5)
+
+// =====================================================
+// N) VALUATION CHECK (MA200 Distance)
+// =====================================================
+float vnindex_d = na
+float vnindex_ma200 = na
+float valuation_distance = na
+bool is_cheap = false
+
+if useValuation
+    vnindex_d := f_sec(sym_vnindex, "D", close)
+    vnindex_ma200 := f_sec(sym_vnindex, "D", ta.sma(close, ma200_len))
+    valuation_distance := vnindex_d / vnindex_ma200
+    is_cheap := valuation_distance < valuation_discount
+
+// =====================================================
+// O) DIVERGENCE DETECTION
+// =====================================================
+float vnindex_m = f_sec(sym_vnindex, "M", close)
+float vnindex_mom_m = math.log(vnindex_m / vnindex_m[1])
+
+f_find_low(float src, int len) =>
+    float low_val = src
+    for i = 1 to len - 1
+        if not na(src[i]) and src[i] < low_val
+            low_val := src[i]
+    low_val
+
+f_find_high(float src, int len) =>
+    float high_val = src
+    for i = 1 to len - 1
+        if not na(src[i]) and src[i] > high_val
+            high_val := src[i]
+    high_val
+
+float price_low_current = vnindex_m
+float price_low_prev = f_find_low(vnindex_m[1], divergence_lookback)
+bool price_lower_low = price_low_current < price_low_prev
+
+// Calculate preliminary risk for divergence check
+float prelim_risk = 0.0
+
+
+// =====================================================
+// P) RISK SCORE + PARTS (RECALIBRATED)
+// =====================================================
+float infl_gap_idx = f_z(pi_gap_m, infl_z_len_m, infl_clip)
+float mom_idx      = f_z(dpi_m,    infl_z_len_m, infl_clip)
+float sur_idx      = f_z(surprise_m, infl_z_len_m, infl_clip)
+
+bool stress_high = false
+if threshold_mode == "Dynamic (z-score)"
+    stress_high := f_robust_zscore(tight_idx, rate_z_len_m, clip_multiplier) > 1.0
+else if threshold_mode == "Percentile-based"
+    stress_high := f_check_percentile_warning(tight_idx, percentile_lookback, 85, false)
+else
+    stress_high := tight_idx > 1.5
+
+if useDXY and dxy_stress > 0
+    stress_high := true
+
+bool curve_inversion = false
+if useYieldCurve
+    if threshold_mode == "Dynamic (z-score)"
+        curve_inversion := f_robust_zscore(yc_slope_m, 60, clip_multiplier) < -1.0 or f_robust_zscore(us_slope_m, 60, clip_multiplier) < -1.0
+    else if threshold_mode == "Percentile-based"
+        curve_inversion := yc_slope_m <= f_percentile_threshold(yc_slope_m, percentile_lookback, 15) or us_slope_m <= f_percentile_threshold(us_slope_m, percentile_lookback, 15)
+    else
+        curve_inversion := yc_slope_m < 0 or us_slope_m < 0
+
+bool inflation_high = false
+if threshold_mode == "Dynamic (z-score)"
+    inflation_high := f_robust_zscore(pi_m, infl_z_len_m, clip_multiplier) > 1.0
+else if threshold_mode == "Percentile-based"
+    inflation_high := f_check_percentile_warning(pi_m, percentile_lookback, 85, false)
+else
+    inflation_high := pi_m > pi_target + 1.0
+
+bool growth_low = false
+if threshold_mode == "Dynamic (z-score)"
+    growth_low := f_robust_zscore(gdp_gap_q, gdp_z_len_q, clip_multiplier) < -1.0
+else if threshold_mode == "Percentile-based"
+    growth_low := f_check_percentile_warning(gdp_gap_q, percentile_lookback, 15, true)
+else
+    growth_low := gdp_gap_q < 0
+
+bool drivers_high = false
+if useDrivers
+    if threshold_mode == "Dynamic (z-score)"
+        drivers_high := f_robust_zscore(IDI, drv_z_len_m, clip_multiplier) > 1.0
+    else if threshold_mode == "Percentile-based"
+        drivers_high := f_check_percentile_warning(IDI, percentile_lookback, 85, false)
+    else
+        drivers_high := IDI > 1.0
+
+// Credit warning
+bool credit_high = false
+if useCredit
+    if threshold_mode == "Dynamic (z-score)"
+        credit_high := f_robust_zscore(credit_idx, credit_z_len_m, clip_multiplier) > 1.0
+    else if threshold_mode == "Percentile-based"
+        credit_high := f_check_percentile_warning(credit_idx, percentile_lookback, 85, false)
+    else
+        credit_high := credit_idx > 1.0
+
+bool external_stress = false
+if useDrivers
+    bool fx_bad = fx_stress > 0.05
+    bool oil_bad = oil_inverse > ta.sma(oil_inverse, 60) * 1.2
+    external_stress := fx_bad or oil_bad
+
+bool intl_warning = false
+bool spread_warning = false
+if useYieldCurve
+    float percentile_val_high = 85.0
+    float percentile_val_low = 15.0
+    if calibration_preset == "Aggressive"
+        percentile_val_high := 90.0
+        percentile_val_low := 10.0
+    else if calibration_preset == "Conservative"
+        percentile_val_high := 80.0
+        percentile_val_low := 20.0
+
+    if threshold_mode == "Dynamic (z-score)"
+        intl_warning := f_robust_zscore(intl_yield_diff, 60, clip_multiplier) < -1.0
+        spread_warning := f_robust_zscore(long_short_spread, 60, clip_multiplier) < -1.0
+    else if threshold_mode == "Percentile-based"
+        intl_warning := f_check_percentile_warning(intl_yield_diff, percentile_lookback, percentile_val_low, true)
+        spread_warning := f_check_percentile_warning(long_short_spread, percentile_lookback, percentile_val_low, true)
+    else
+        intl_warning := intl_yield_diff < 0.5
+        spread_warning := long_short_spread < 0.5
+
+// RECALIBRATED LAYERS
+float layer1_score = stress_high ? w_stress : 0.0
+layer1_score += useDXY and dxy_stress > 0 ? w_dxy : 0.0
+
+float layer2_score = (curve_inversion ? w_curve : 0.0) + (growth_low ? w_growth : 0.0) + (spread_warning ? w_spread : 0.0)
+
+float layer3_score = (intl_warning ? w_intl : 0.0) + (inflation_high ? w_inflation : 0.0) + (drivers_high ? w_drv : 0.0) + (external_stress ? 1.0 : 0.0)
+layer3_score += useCredit and credit_high ? w_credit : 0.0
+
+float risk_score = layer1_score + layer2_score + layer3_score
+float max_score = w_stress + w_curve + w_growth + w_spread + w_intl + w_inflation + w_drv + w_credit + w_dxy + 1.0
+float risk_pct = max_score > 0 ? (risk_score / max_score) * 100.0 : 0.0
+
+// VALUATION ADJUSTMENT
+if useValuation and is_cheap and risk_pct > 60
+    risk_pct := risk_pct * 0.85  // Giảm 15% nếu giá rẻ
+
+float risk_forecast = ta.linreg(risk_pct, risk_forecast_lookback, 0)
+int risk_bucket = f_bucket_from_risk(risk_pct)
+int current_bucket = risk_bucket
+
+// MACRO REVERSAL DETECTION
+bool macro_improving = risk_forecast < risk_pct and risk_pct < 60
+bool macro_deteriorating = risk_forecast > risk_pct and risk_pct > 40
+
+// DIVERGENCE SIGNAL
+float risk_high_current = risk_pct
+float risk_high_prev = f_find_high(risk_pct[1], divergence_lookback)
+bool risk_lower_high = risk_high_current < risk_high_prev
+
+bool bullish_divergence = price_lower_low and risk_lower_high and risk_pct < 70
+
+float S_infl_old = infl_gap_idx + 0.5 * mom_idx + 0.5 * sur_idx + 0.5 * sur_idx
+float S_pol_old  = tight_idx + 0.5 * f_z(policy_gap, policy_z_len_m, 2.5)
+float S_grow_old = -grow_idx
+float S_drv_old  = useDrivers ? 0.5 * IDI : na
+
+float RiskScore_old = risk_pct
+
+float S_infl = inflation_high ? 1.0 : 0.0
+float S_pol  = stress_high     ? 1.0 : 0.0
+float S_grow = growth_low      ? 1.0 : 0.0
+float S_drv  = drivers_high    ? 1.0 : 0.0
+
+float RiskScore = risk_pct
+
+// SCENARIO ANALYSIS - Enhanced
+bool scenario_liquidity_crisis = stress_high and curve_inversion and intl_warning
+bool scenario_growth_slowdown = growth_low and drivers_high and spread_warning
+bool scenario_inflation_surge = inflation_high and external_stress and drivers_high
+bool scenario_stagflation = inflation_high and growth_low and stress_high
+bool scenario_soft_landing = macro_improving and not inflation_high and not stress_high
+bool scenario_bull_market = bullish_divergence and is_cheap and macro_improving
+bool scenario_bear_market = risk_pct > 70 and macro_deteriorating and not is_cheap
+bool scenario_credit_bubble = credit_high and inflation_high and valuation_distance > 1.2
+
+string scenario_name = "Bình thường"
+int scenario_severity = 0  // 0=neutral, 1=caution, 2=warning, 3=danger, 4=opportunity
+
+if scenario_bull_market
+    scenario_name := "CƠ HỘI MUA - Phân kỳ tích cực"
+    scenario_severity := 4
+else if scenario_liquidity_crisis
+    scenario_name := "KHỦNG HOẢNG THANH KHOẢN"
+    scenario_severity := 3
+else if scenario_stagflation
+    scenario_name := "STAGFLATION - Lạm phát + Tăng trưởng yếu"
+    scenario_severity := 3
+else if scenario_credit_bubble
+    scenario_name := "BỘT TÌNH DỤNG - Quá nóng"
+    scenario_severity := 3
+else if scenario_bear_market
+    scenario_name := "THỊ TRƯỜNG XẤU ĐI"
+    scenario_severity := 2
+else if scenario_inflation_surge
+    scenario_name := "ÁP LỰC LẠM PHÁT"
+    scenario_severity := 2
+else if scenario_growth_slowdown
+    scenario_name := "TĂNG TRƯỞNG CHẬM LẠI"
+    scenario_severity := 2
+else if scenario_soft_landing
+    scenario_name := "HẠ CÁNH MỀM - Tích cực"
+    scenario_severity := 1
+
+float vnindex_idx = f_z(vnindex_mom_m, 60, 2.5)
+bool equity_low = vnindex_idx < -1.0
+if equity_low
+    risk_score += 0.5
+    risk_pct := max_score > 0 ? (risk_score / max_score) * 100.0 : 0.0
+
+
+
+// =====================================================
+// P) PERFORMANCE TRACKING
+// =====================================================
+var float[] perf_forecast_errors = array.new_float()
+var float[] perf_risk_changes = array.new_float()
+
+float forecast_error = math.abs(risk_pct - risk_pct[12])
+if not na(forecast_error) and isNewMonth
+    array.push(perf_forecast_errors, forecast_error)
+    if array.size(perf_forecast_errors) > 24
+        array.shift(perf_forecast_errors)
+
+float risk_change = math.abs(risk_pct - risk_pct[1])
+if not na(risk_change) and barstate.islast
+    array.push(perf_risk_changes, risk_change)
+    if array.size(perf_risk_changes) > 60
+        array.shift(perf_risk_changes)
+
+float perf_mae = array.size(perf_forecast_errors) > 0 ? array.avg(perf_forecast_errors) : na
+float perf_volatility = array.size(perf_risk_changes) > 0 ? array.stdev(perf_risk_changes) : na
+float perf_accuracy = na(perf_mae) ? na : perf_mae < 5 ? 95.0 : perf_mae < 10 ? 85.0 : perf_mae < 15 ? 75.0 : 60.0
+
+
+// =====================================================
+// Q) PCTL PACK (arrays)
+// =====================================================
+var float[] arr_m2 = array.new_float()
+var float[] arr_m2gap = array.new_float()
+var float[] arr_credit_idx = array.new_float()
+var float[] arr_dxy = array.new_float()
+var float[] arr_valuation = array.new_float()
+
+var float[] arr_risk   = array.new_float()
+var float[] arr_pi     = array.new_float()
+var float[] arr_epi    = array.new_float()
+var float[] arr_gap    = array.new_float()
+var float[] arr_dpi    = array.new_float()
+var float[] arr_sur    = array.new_float()
+var float[] arr_ipol   = array.new_float()
+var float[] arr_iib    = array.new_float()
+var float[] arr_diib   = array.new_float()
+var float[] arr_rreal  = array.new_float()
+var float[] arr_tight  = array.new_float()
+var float[] arr_polgap = array.new_float()
+var float[] arr_gdp    = array.new_float()
+var float[] arr_gdpgap = array.new_float()
+var float[] arr_grow   = array.new_float()
+var float[] arr_idi    = array.new_float()
+var float[] arr_zppi   = array.new_float()
+var float[] arr_zfx    = array.new_float()
+var float[] arr_zoil   = array.new_float()
+var float[] arr_yc     = array.new_float()
+var float[] arr_ycidx  = array.new_float()
+var float[] arr_usyc     = array.new_float()
+var float[] arr_usycidx  = array.new_float()
+var float[] arr_sinfl  = array.new_float()
+var float[] arr_spol   = array.new_float()
+var float[] arr_sgrow  = array.new_float()
+var float[] arr_sdrv   = array.new_float()
+
+var float[] arr_risk_pct     = array.new_float()
+var float[] arr_risk_forecast = array.new_float()
+var float[] arr_layer1       = array.new_float()
+var float[] arr_layer2       = array.new_float()
+var float[] arr_layer3       = array.new_float()
+var float[] arr_intl_diff    = array.new_float()
+var float[] arr_long_short   = array.new_float()
+var float[] arr_vnindex_mom  = array.new_float()
+
+if isNewMonth
+    f_arr_push_float(arr_pi,     pi_m,        120)
+    f_arr_push_float(arr_epi,    pi_e_m,      120)
+    f_arr_push_float(arr_gap,    pi_gap_m,    120)
+    f_arr_push_float(arr_dpi,    dpi_m,       120)
+    f_arr_push_float(arr_sur,    surprise_m,  120)
+    f_arr_push_float(arr_ipol,   i_policy_m,  120)
+    f_arr_push_float(arr_iib,    i_ib_m,      120)
+    f_arr_push_float(arr_diib,   di_ib_m,     120)
+    f_arr_push_float(arr_rreal,  r_real_m,    120)
+    f_arr_push_float(arr_tight,  tight_idx,   120)
+    f_arr_push_float(arr_polgap, policy_gap,  120)
+    f_arr_push_float(arr_gdp,    gdp_q,       120)
+    f_arr_push_float(arr_gdpgap, gdp_gap_q,   120)
+    f_arr_push_float(arr_grow,   grow_idx,    120)
+    f_arr_push_float(arr_idi,    IDI,         120)
+    f_arr_push_float(arr_zppi,   z_ppi_gap,   120)
+    f_arr_push_float(arr_zfx,    z_fx_mom,    120)
+    f_arr_push_float(arr_zoil,   z_oil_mom,   120)
+    f_arr_push_float(arr_yc,     yc_slope_m,  120)
+    f_arr_push_float(arr_ycidx,  yc_idx,      120)
+    f_arr_push_float(arr_usyc,     us_slope_m,  120)
+    f_arr_push_float(arr_usycidx,  us_idx,      120)
+    f_arr_push_float(arr_sinfl,  S_infl,      120)
+    f_arr_push_float(arr_spol,   S_pol,       120)
+    f_arr_push_float(arr_sgrow,  S_grow,      120)
+    f_arr_push_float(arr_sdrv,   S_drv,       120)
+    f_arr_push_float(arr_risk,   RiskScore,   120)
+    if useCredit
+        f_arr_push_float(arr_m2, m2_yoy_m, 120)
+        f_arr_push_float(arr_m2gap, m2_gap_m, 120)
+        f_arr_push_float(arr_credit_idx, credit_idx, 120)
+    if useDXY
+        f_arr_push_float(arr_dxy, dxy_m, 120)
+    if useValuation
+        f_arr_push_float(arr_valuation, valuation_distance, 120)
+
+if barstate.islast or timeframe.change("M")
+    f_arr_push_float(arr_risk, RiskScore_old, 500)
+    f_arr_push_float(arr_pi, pi_m, 500)
+    f_arr_push_float(arr_epi, pi_e_m, 500)
+    f_arr_push_float(arr_gap, pi_gap_m, 500)
+    f_arr_push_float(arr_dpi, dpi_m, 500)
+    f_arr_push_float(arr_sur, surprise_m, 500)
+    f_arr_push_float(arr_ipol, i_policy_m, 500)
+    f_arr_push_float(arr_iib, i_ib_m, 500)
+    f_arr_push_float(arr_diib, di_ib_m, 500)
+    f_arr_push_float(arr_rreal, r_real_m, 500)
+    f_arr_push_float(arr_tight, tight_idx, 500)
+    f_arr_push_float(arr_polgap, policy_gap, 500)
+    f_arr_push_float(arr_gdp, gdp_q, 500)
+    f_arr_push_float(arr_gdpgap, gdp_gap_q, 500)
+    f_arr_push_float(arr_grow, grow_idx, 500)
+    if useDrivers
+        f_arr_push_float(arr_idi, IDI, 500)
+        f_arr_push_float(arr_zppi, z_ppi_gap, 500)
+        f_arr_push_float(arr_zfx, z_fx_mom, 500)
+        f_arr_push_float(arr_zoil, z_oil_mom, 500)
+    if useYieldCurve
+        f_arr_push_float(arr_yc, yc_slope_m, 500)
+        f_arr_push_float(arr_ycidx, yc_idx, 500)
+    f_arr_push_float(arr_usyc, us_slope_m, 500)
+    f_arr_push_float(arr_usycidx, us_idx, 500)
+    f_arr_push_float(arr_sinfl, S_infl, 500)
+    f_arr_push_float(arr_spol, S_pol, 500)
+    f_arr_push_float(arr_sgrow, S_grow, 500)
+    f_arr_push_float(arr_sdrv, S_drv, 500)
+    f_arr_push_float(arr_risk_pct, risk_pct, 500)
+    f_arr_push_float(arr_risk_forecast, risk_forecast, 500)
+    f_arr_push_float(arr_layer1, layer1_score, 500)
+    f_arr_push_float(arr_layer2, layer2_score, 500)
+    f_arr_push_float(arr_layer3, layer3_score, 500)
+    f_arr_push_float(arr_intl_diff, intl_yield_diff, 500)
+    f_arr_push_float(arr_long_short, long_short_spread, 500)
+    f_arr_push_float(arr_vnindex_mom, vnindex_mom_m, 500)
+    // ADD MISSING ARRAYS
+    if useCredit
+        f_arr_push_float(arr_m2, m2_yoy_m, 500)
+        f_arr_push_float(arr_m2gap, m2_gap_m, 500)
+        f_arr_push_float(arr_credit_idx, credit_idx, 500)
+    if useDXY
+        f_arr_push_float(arr_dxy, dxy_m, 500)
+    if useValuation
+        f_arr_push_float(arr_valuation, valuation_distance, 500)
+
+float p_pi      = f_arr_pctl(arr_pi, pi_m)
+float p_epi     = f_arr_pctl(arr_epi, pi_e_m)
+float p_gap     = f_arr_pctl(arr_gap, pi_gap_m)
+float p_dpi     = f_arr_pctl(arr_dpi, dpi_m)
+float p_sur     = f_arr_pctl(arr_sur, surprise_m)
+float p_ipol    = f_arr_pctl(arr_ipol, i_policy_m)
+float p_iib     = f_arr_pctl(arr_iib, i_ib_m)
+float p_diib    = f_arr_pctl(arr_diib, di_ib_m)
+float p_rreal   = f_arr_pctl(arr_rreal, r_real_m)
+float p_tight   = f_arr_pctl(arr_tight, tight_idx)
+float p_polgap  = f_arr_pctl(arr_polgap, policy_gap)
+float p_gdp     = f_arr_pctl(arr_gdp, gdp_q)
+float p_gdpgap  = f_arr_pctl(arr_gdpgap, gdp_gap_q)
+float p_grow    = f_arr_pctl(arr_grow, grow_idx)
+float p_idi     = useDrivers ? f_arr_pctl(arr_idi, IDI) : na
+float p_zppi    = useDrivers ? f_arr_pctl(arr_zppi, z_ppi_gap) : na
+float p_zfx     = useDrivers ? f_arr_pctl(arr_zfx, z_fx_mom) : na
+float p_zoil    = useDrivers ? f_arr_pctl(arr_zoil, z_oil_mom) : na
+float p_yc      = useYieldCurve ? f_arr_pctl(arr_yc, yc_slope_m) : na
+float p_ycidx   = useYieldCurve ? f_arr_pctl(arr_ycidx, yc_idx) : na
+float p_usyc    = f_arr_pctl(arr_usyc, us_slope_m)
+float p_usycidx = f_arr_pctl(arr_usycidx, us_idx)
+float p_sinfl   = f_arr_pctl(arr_sinfl, S_infl)
+float p_spol    = f_arr_pctl(arr_spol, S_pol)
+float p_sgrow   = f_arr_pctl(arr_sgrow, S_grow)
+float p_sdrv    = f_arr_pctl(arr_sdrv, S_drv)
+float p_risk    = f_arr_pctl(arr_risk_pct, risk_pct)
+float p_risk_forecast = f_arr_pctl(arr_risk_forecast, risk_forecast)
+float p_layer1  = f_arr_pctl(arr_layer1, layer1_score)
+float p_layer2  = f_arr_pctl(arr_layer2, layer2_score)
+float p_layer3  = f_arr_pctl(arr_layer3, layer3_score)
+float p_intl    = useYieldCurve ? f_arr_pctl(arr_intl_diff, intl_yield_diff) : na
+float p_spread  = useYieldCurve ? f_arr_pctl(arr_long_short, long_short_spread) : na
+float p_vnindex_mom = f_arr_pctl(arr_vnindex_mom, vnindex_mom_m)
+// ADD MISSING PERCENTILES
+float p_m2 = useCredit ? f_arr_pctl(arr_m2, m2_yoy_m) : na
+float p_m2gap = useCredit ? f_arr_pctl(arr_m2gap, m2_gap_m) : na
+float p_credit = useCredit ? f_arr_pctl(arr_credit_idx, credit_idx) : na
+float p_dxy = useDXY ? f_arr_pctl(arr_dxy, dxy_m) : na
+float p_valuation = useValuation ? f_arr_pctl(arr_valuation, valuation_distance) : na
+
+// =====================================================
+// N) DISPLAY CONTROL
+// =====================================================
+bool showPlots = true  // FIXED: Changed from displayMode dependency
+
+// =====================================================
+// O) PLOTS
+// =====================================================
+plot(showPlots and panel==1 ? pi_trend_m : na, "P1 Trend", linewidth=2, color=color.gray)
+plot(showPlots and panel==1 ? pi_gap_m   : na, "P1 Gap",   style=plot.style_area, color=color.new(color.orange, 80))
+plot(showPlots and panel==1 ? pi_m       : na, "P1 Inflation",   linewidth=2, trackprice=true, color=color.purple)
+hline(showPlots and panel==1 ? pi_target : na, 'P1 Inflation target', color=color.red, linestyle=hline.style_dashed)
+
+plot(showPlots and panel==2 ? tight_idx  : na, "P2 TightIdx", style=plot.style_area, color=color.new(color.red, 80))
+plot(showPlots and panel==2 ? i_policy_m : na, "P2 Policy", linewidth=2, trackprice=true, color=color.black)
+plot(showPlots and panel==2 ? i_ib_m     : na, "P2 IB",     linewidth=2, trackprice=true, color=color.red)
+plot(showPlots and panel==2 ? vn10y_m : na, "P2 VN 10Y", linewidth=1, color=color.lime)
+
+plot(showPlots and panel==3 ? gdp_gap_q   : na, "P3 GDP gap", style=plot.style_area, color=color.new(color.purple, 80))
+plot(showPlots and panel==3 ? gdp_q       : na, "P3 GDP", linewidth=2, trackprice=true, color=color.black)
+plot(showPlots and panel==3 ? gdp_trend_q : na, "P3 GDP trend", linewidth=2, color=color.red)
+
+plot(showPlots and panel==4 ? IDI      : na, "P4 IDI", style=plot.style_area, color=color.new(color.blue, 80))
+plot(showPlots and panel==4 ? z_fx_mom : na, "P4 FX (idx)", linewidth=2, color=color.orange)
+
+plot(showPlots and panel==5 ? yc_idx     : na, "P5 YC idx", style=plot.style_area, color=color.new(color.gray, 80))
+plot(showPlots and panel==5 ? yc_slope_m : na, "P5 YC slope", linewidth=2, trackprice=true, color=color.black)
+
+plot(showPlots and panel==6 ? RiskScore_old : na, "P6 RiskScore (Old)", style=plot.style_area, color=color.new(color.red, 80))
+plot(showPlots and panel==6 ? S_infl_old    : na, "P6 Infl part (Old)", linewidth=2)
+
+plot(showPlots and panel==7 ? credit_idx : na, "P7 Credit Idx", style=plot.style_area, color=color.new(color.purple, 80))
+plot(showPlots and panel==7 ? m2_yoy_m : na, "P7 M2 YoY", linewidth=2, trackprice=true, color=color.black)
+
+plot(showPlots and panel==8 ? us_idx     : na, "P8 US YC idx", style=plot.style_area, color=color.new(color.gray, 80))
+plot(showPlots and panel==8 ? us_slope_m : na, "P8 US YC slope", linewidth=2, trackprice=true, color=color.black)
+plot(showPlots and panel==8 ? us10y_m : na, "P8 US 10Y", linewidth=2, color=color.rgb(120, 247, 10))
+plot(showPlots and panel==8 ? us02y_m : na, "P8 US 02Y", linewidth=2, color=color.yellow)
+plot(showPlots and panel==8 ? vn10y_m : na, "P8 VN 10Y", linewidth=1, color=color.rgb(247, 18, 10))
+
+plot(showPlots and (panel==5 or panel==8) ? intl_yield_diff : na, "Intl Yield Diff", linewidth=1, color=color.blue)
+plot(showPlots and (panel==5 or panel==8) ? long_short_spread : na, "Long-Short Spread", linewidth=1, color=color.green)
+
+plot(showPlots and panel==9 ? risk_pct       : na, "P9 Risk %", linewidth=3, color=color.red)
+plot(showPlots and panel==9 ? risk_forecast  : na, "P9 Risk Forecast", linewidth=2, color=color.blue, style=plot.style_linebr)
+hline(showPlots and panel==9 ? 60 : na, "High Risk Threshold", color=color.orange, linestyle=hline.style_dashed)
+hline(showPlots and panel==9 ? 40 : na, "Low Risk Threshold", color=color.green, linestyle=hline.style_dashed)
+
+bgcolor(showPlots and panel==10 ? f_bucket_bg(current_bucket) : na, title="P10 Regime Background")
+plot(showPlots and panel==10 ? risk_pct : na, "P10 Current Risk %", linewidth=3, color=color.white)
+plot(showPlots and panel==10 ? risk_forecast : na, "P10 Forecast", linewidth=2, color=color.yellow)
+
+plot(showPlots and panel==11 ? valuation_distance * 100 : na, "P11 Valuation %", linewidth=2, color=color.blue)
+plot(showPlots and panel==11 ? risk_pct : na, "P11 Risk %", linewidth=2, color=color.red)
+hline(showPlots and panel==11 ? valuation_discount * 100 : na, "Cheap Threshold", color=color.green, linestyle=hline.style_dashed)
+
+plotshape(showPlots and panel==11 and bullish_divergence, "Bullish Divergence", shape.labelup, location.bottom, color.green, text="BUY?", textcolor=color.white, size=size.small)
+
+// =====================================================
+// P) ALERTS
+// =====================================================
+alertcondition(risk_pct > 60, title="High Risk Alert", message="Risk PCT > 60% - Phong thu!")
+alertcondition(bullish_divergence, title="Bullish Divergence", message="PHAN KY TICH CUC - Gia xuong, Rui ro giam!")
+alertcondition(macro_improving, title="Macro Improving", message="Vi mo bat dau cai thien - Forecast 12 thang < Current Risk")
+alertcondition(macro_deteriorating, title="Macro Deteriorating", message="Vi mo dang xau di - Forecast 12 thang > Current Risk")
+alertcondition(useDXY and dxy_m > dxy_threshold and i_ib_m > i_ib_m[1], title="DXY + IB Stress", message="DXY cao + Lai lien ngan hang tang - Canh bao ty gia!")
+alertcondition(useValuation and is_cheap and risk_pct > 60, title="Cheap Valuation Alert", message="Gia RE (< MA200*80%) nhung vi mo xau - Co hoi gom hang!")
+
+// =====================================================
+// T) TABLE DISPLAY
+// =====================================================
+f_tbl_pos() =>
+    tblPosOpt == "Top Left" ? position.top_left : tblPosOpt == "Bottom Right" ? position.bottom_right : tblPosOpt == "Bottom Left" ? position.bottom_left : position.top_right
+
+f_tbl_size() =>
+    fontOpt == "Tiny" ? size.tiny : fontOpt == "Normal" ? size.normal : size.small
+
+var table t = table.new(position.top_right, 4, 50, border_width=1)
+
+f_cell(int r, int c, string txt, color bg, color tc, halign) =>
+    table.cell(t, c, r, txt, bgcolor=bg, text_color=tc, text_size=f_tbl_size(), text_halign=halign, text_valign=text.align_center)
+
+f_hdr(int r, string txt) =>
+    f_cell(r, 0, txt, color.new(color.blue, 15), color.white, text.align_left)
+    table.merge_cells(t, 0, r, 3, r)
+
+f_row(int r, string metric, string value, string pctl, float p, bool highbad, string meaning) =>
+    color bg = color.black
+    color p_bg = pctlColorOn ? f_pctl_bg_dir(p, highbad) : color.new(color.black, 85)
+    f_cell(r, 0, metric, bg, color.white, text.align_left)
+    f_cell(r, 1, value,  bg, color.white, text.align_right)
+    f_cell(r, 2, pctl,   p_bg, color.black, text.align_center)
+    f_cell(r, 3, meaning,bg, color.white, text.align_left)
+
+if barstate.islast
+    table.set_position(t, f_tbl_pos())
+
+    // HEADER with Valuation & Divergence status
+    string valuation_txt = useValuation ? (is_cheap ? " | GIÁ RẺ ✓" : " | GIÁ ĐẮT") : ""
+    string divergence_txt = bullish_divergence ? " | PHÂN KỲ TÍCH CỰC ⬆" : ""
+    string macro_status = macro_improving ? " | VI MÔ CẢI THIỆN ✓" : macro_deteriorating ? " | VI MÔ XẤU ĐI ⚠" : ""
+
+    string head_txt = f_bucket_label(risk_bucket) + " | Risk " + f_fmt(risk_pct,1) + "% → " + f_fmt(risk_forecast,1) + "%" + valuation_txt + divergence_txt + macro_status
+    color head_bg = f_bucket_bg(risk_bucket)
+    f_cell(0, 0, head_txt, head_bg, color.black, text.align_center)
+    table.merge_cells(t, 0, 0, 3, 0)
+
+    row_offset = 1
+    // SIGNAL DASHBOARD
+    f_cell(row_offset, 0, "Liquidity Stress", color.new(color.black,0), color.white, text.align_left)
+    f_cell(row_offset, 1, stress_high ? "CĂNG THẲNG" : "BÌNH THƯỜNG", stress_high ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_center)
+    f_cell(row_offset,2, "Growth (GDP)", color.new(color.black,0), color.white, text.align_left)
+    f_cell(row_offset,3, growth_low ? "YẾU" : "MẠNH", growth_low ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_center)
+
+    if useDXY
+        row_offset += 1
+        f_cell(row_offset, 0, "DXY Status", color.new(color.black,0), color.white, text.align_left)
+        f_cell(row_offset, 1, dxy_stress > 0 ? "CAO (>105)" : "ỔN", dxy_stress > 0 ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_center)
+        f_cell(row_offset, 2, f_fmt(dxy_m,1), color.new(color.black,0), color.white, text.align_right)
+
+    row_offset += 1
+
+    f_cell(row_offset, 0, "Yield Curve", color.new(color.black,0), color.white, text.align_left)
+    f_cell(row_offset, 1, curve_inversion ? "ĐẢO NGƯỢC" : "BÌNH THƯỜNG", curve_inversion ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_center)
+
+    f_cell(row_offset, 2, "Inflation", color.new(color.black,0), color.white, text.align_left)
+    f_cell(row_offset, 3, inflation_high ? "CAO" : "ỔN ĐỊNH", inflation_high ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_center)
+
+    row_offset := row_offset -1
+    row_offset := row_offset -1
+
+    if useCredit
+        f_cell(row_offset+3, 0, "Credit Growth", color.new(color.black,0), color.white, text.align_left)
+        f_cell(row_offset+3, 1, credit_high ? "NÓNG" : "ỔN", credit_high ? color.new(color.orange,60) : color.new(color.green,60), color.white, text.align_center)
+        f_cell(row_offset+3, 2, f_fmt(m2_yoy_m,1)+"%", color.new(color.black,0), color.white, text.align_right)
+        row_offset += 1
+
+    if useValuation
+        f_cell(row_offset+3, 0, "Valuation", color.new(color.black,0), color.white, text.align_left)
+        f_cell(row_offset+3, 1, is_cheap ? "RẺ (Cơ hội)" : "ĐẮT", is_cheap ? color.new(color.green,60) : color.new(color.orange,60), color.white, text.align_center)
+        f_cell(row_offset+3, 2, f_fmt(valuation_distance*100,1)+"%", color.new(color.black,0), color.white, text.align_right)
+        row_offset += 1
+
+    // MACRO REVERSAL INDICATOR
+    f_cell(row_offset+3, 0, "ĐẢO CHIỀU VĨ MÔ", color.new(color.blue,20), color.white, text.align_left)
+    string reversal_status = macro_improving ? "Đang CẢI THIỆN ✓" : macro_deteriorating ? "Đang XẤU ĐI ⚠" : "Ổn định"
+    color reversal_color = macro_improving ? color.new(color.green,60) : macro_deteriorating ? color.new(color.red,60) : color.new(color.black,0)
+    f_cell(row_offset+3, 1, reversal_status, reversal_color, color.white, text.align_center)
+    table.merge_cells(t, 1, row_offset+3, 3, row_offset+3)
+
+    // DIVERGENCE SIGNAL
+    f_cell(row_offset+4, 0, "PHÂN KỲ VĨ MÔ-GIÁ", color.new(color.blue,20), color.white, text.align_left)
+    string div_status = bullish_divergence ? "TÍCH CỰC - GOM HÀNG ✓" : "Chưa có"
+    color div_color = bullish_divergence ? color.new(color.green,40) : color.new(color.black,0)
+    f_cell(row_offset+4, 1, div_status, div_color, color.white, text.align_center)
+    table.merge_cells(t, 1, row_offset+4, 3, row_offset+4)
+
+    // LAYERS
+    row_offset += 5
+    f_cell(row_offset, 0, "Layer 1: Funding/Liquidity", color.new(color.blue,20), color.white, text.align_left)
+    f_cell(row_offset, 1, f_fmt(layer1_score,1), color.new(color.black,0), color.white, text.align_right)
+
+    f_cell(row_offset+1, 0, "Layer 2: Cycle/Growth", color.new(color.blue,20), color.white, text.align_left)
+    f_cell(row_offset+1, 1, f_fmt(layer2_score,1), color.new(color.black,0), color.white, text.align_right)
+
+    f_cell(row_offset+2, 0, "Layer 3: External/Inflation", color.new(color.blue,20), color.white, text.align_left)
+    f_cell(row_offset+2, 1, f_fmt(layer3_score,1), color.new(color.black,0), color.white, text.align_right)
+
+    // SCENARIO - ENHANCED
+    row_offset += 3
+    color scenario_bg = scenario_severity == 4 ? color.new(color.green,40) : scenario_severity == 3 ? color.new(color.red,50) : scenario_severity == 2 ? color.new(color.orange,60) : scenario_severity == 1 ? color.new(color.blue,60) : color.new(color.black,10)
+
+    f_cell(row_offset, 0, "🎯 KỊCH BẢN VI MÔ", color.new(color.blue,20), color.white, text.align_left)
+    f_cell(row_offset, 1, scenario_name, scenario_bg, color.white, text.align_left)
+    table.merge_cells(t, 1, row_offset, 3, row_offset)
+
+    // SCENARIO DETAILS
+    row_offset += 1
+    string scenario_detail = ""
+    if scenario_liquidity_crisis
+        scenario_detail := "⚠ Căng thẳng thanh khoản + Đảo ngược YC + Áp lực quốc tế"
+    else if scenario_stagflation
+        scenario_detail := "⚠ Lạm phát cao + GDP yếu + Lãi suất thắt → Rất khó xử lý"
+    else if scenario_credit_bubble
+        scenario_detail := "⚠ Tín dụng nóng + Lạm phát + Định giá cao → Rủi ro sụp đổ"
+    else if scenario_bear_market
+        scenario_detail := "📉 Risk cao + Vĩ mô xấu đi + Định giá không hấp dẫn"
+    else if scenario_bull_market
+        scenario_detail := "✅ Giá rẻ + Phân kỳ tích cực + Vĩ mô cải thiện → MUA DẦN"
+    else if scenario_inflation_surge
+        scenario_detail := "⚠ Lạm phát + Chi phí tăng + FX/Oil bất ổn"
+    else if scenario_growth_slowdown
+        scenario_detail := "📉 GDP yếu + Chi phí cao + Spread thu hẹp"
+    else if scenario_soft_landing
+        scenario_detail := "✅ Vĩ mô ổn định và cải thiện dần"
+    else
+        scenario_detail := "Không có tín hiệu đặc biệt, tiếp tục theo dõi"
+
+    f_cell(row_offset, 0, "Chi tiết:", color.new(color.black,10), color.yellow, text.align_left)
+    f_cell(row_offset, 1, scenario_detail, color.new(color.black,10), color.white, text.align_left)
+    table.merge_cells(t, 1, row_offset, 3, row_offset)
+
+    // PERFORMANCE STATS
+    row_offset += 1
+    f_cell(row_offset, 0, "📊 HIỆU SUẤT DỰ BÁO", color.new(color.purple,20), color.white, text.align_left)
+    table.merge_cells(t, 0, row_offset, 3, row_offset)
+
+    row_offset += 1
+    f_cell(row_offset, 0, "Độ chính xác", color.new(color.black,0), color.white, text.align_left)
+    string accuracy_text = na(perf_accuracy) ? "Chưa đủ dữ liệu" : f_fmt(perf_accuracy,1) + "%"
+    color accuracy_color = na(perf_accuracy) ? color.new(color.gray,60) : perf_accuracy > 85 ? color.new(color.green,60) : perf_accuracy > 75 ? color.new(color.orange,60) : color.new(color.red,60)
+    f_cell(row_offset, 1, accuracy_text, accuracy_color, color.white, text.align_center)
+    table.merge_cells(t, 1, row_offset, 2, row_offset)
+    f_cell(row_offset, 3, "MAE: " + (na(perf_mae) ? "-" : f_fmt(perf_mae,1)), color.new(color.black,0), color.white, text.align_left)
+
+    row_offset += 1
+    f_cell(row_offset, 0, "Độ biến động Risk", color.new(color.black,0), color.white, text.align_left)
+    string volatility_text = na(perf_volatility) ? "-" : f_fmt(perf_volatility,2)
+    f_cell(row_offset, 1, volatility_text, color.new(color.black,0), color.white, text.align_right)
+    f_cell(row_offset, 2, "σ", color.new(color.black,0), color.gray, text.align_center)
+    string vol_meaning = na(perf_volatility) ? "Chưa đủ dữ liệu" : perf_volatility < 3 ? "Ổn định" : perf_volatility < 6 ? "Vừa phải" : "Biến động cao"
+    f_cell(row_offset, 3, vol_meaning, color.new(color.black,0), color.white, text.align_left)
+
+    // PANEL-SPECIFIC DETAILS - ENHANCED
+    row_offset += 1
+    f_cell(row_offset, 0, "📋 CHI TIẾT " + panelOption, color.new(color.blue,0), color.white, text.align_left)
+    table.merge_cells(t, 0, row_offset, 3, row_offset)
+
+    row_offset += 1
+    f_cell(row_offset, 0, "CHỈ TIÊU", color.new(color.blue,0), color.white, text.align_left)
+    f_cell(row_offset, 1, "GIÁ TRỊ", color.new(color.blue,0), color.white, text.align_right)
+    f_cell(row_offset, 2, "PCTL", color.new(color.blue,0), color.white, text.align_center)
+    f_cell(row_offset, 3, "Ý NGHĨA", color.new(color.blue,0), color.white, text.align_left)
+
+    // Panel-specific rows
+    row_offset += 1
+    if panel == 7 and useCredit
+        f_row(row_offset, "M2 YoY", f_fmt(m2_yoy_m,2)+"%", f_pctl_text(p_m2,true), p_m2, true, "Tăng trưởng tín dụng")
+        f_row(row_offset+1, "M2 vs Trend", f_fmt(m2_gap_m,2), f_pctl_text(p_m2gap,true), p_m2gap, true, "Cao = nóng")
+        f_row(row_offset+2, "Credit Index", f_fmt(credit_idx,2), f_pctl_text(p_credit,true), p_credit, true, "Chỉ số tổng hợp")
+        row_offset += 3
+        string credit_status = credit_high ? "⚠ NÓNG - Cần thắt chặt" : m2_yoy_m > 15 ? "Tăng cao" : "Ổn định"
+        f_cell(row_offset, 0, "Trạng thái:", color.new(color.blue,20), color.white, text.align_left)
+        f_cell(row_offset, 1, credit_status, credit_high ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 11 and useValuation
+        f_row(row_offset, "VNINDEX/MA200", f_fmt(valuation_distance*100,1)+"%", f_pctl_text(p_valuation,true), p_valuation, false, "< 80% = rẻ")
+        f_row(row_offset+1, "Risk %", f_fmt(risk_pct,1), f_pctl_text(p_risk,true), p_risk, true, "Rủi ro vĩ mô")
+        f_row(row_offset+2, "Divergence", bullish_divergence ? "CÓ ✓" : "CHƯA", "-", na, false, "Giá xuống, Risk giảm")
+        row_offset += 3
+        string valuation_guide = is_cheap and risk_pct > 60 ? "✅ CƠ HỘI: Rẻ + Risk cao → Gom từ từ" : is_cheap ? "Giá hợp lý" : valuation_distance > 1.2 ? "⚠ ĐẮT - Thận trọng" : "Trung tính"
+        f_cell(row_offset, 0, "Đánh giá:", color.new(color.blue,20), color.white, text.align_left)
+        color val_color = is_cheap and risk_pct > 60 ? color.new(color.green,40) : valuation_distance > 1.2 ? color.new(color.red,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, valuation_guide, val_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 1
+        f_row(row_offset, WD_INFL, f_fmt(pi_m,2)+"%", f_pctl_text(p_pi,true), p_pi, true, "Tháng này")
+        f_row(row_offset+1, WD_FORECAST, f_fmt(pi_e_m,2)+"%", f_pctl_text(p_epi,true), p_epi, true, "Dự báo tháng sau")
+        f_row(row_offset+2, WD_VS_TREND, f_fmt(pi_gap_m,2), f_pctl_text(p_gap,true), p_gap, true, "Dương(+)=nóng hơn")
+        f_row(row_offset+3, WD_MOM, f_fmt(dpi_m,2), f_pctl_text(p_dpi,true), p_dpi, true, "Tháng này vs tháng trước")
+        f_row(row_offset+4, WD_SURPRISE, f_fmt(surprise_m,2), f_pctl_text(p_sur,true), p_sur, true, "Dương(+)=cao hơn dự đoán")
+        row_offset += 5
+        string infl_trend = pi_m > pi_e_m ? "📈 Cao hơn dự báo" : pi_m < pi_e_m - 0.5 ? "📉 Thấp hơn dự báo" : "➡ Đúng dự báo"
+        f_cell(row_offset, 0, "Xu hướng:", color.new(color.blue,20), color.white, text.align_left)
+        f_cell(row_offset, 1, infl_trend, color.new(color.black,10), color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 2
+        f_row(row_offset, WD_POLICY, f_fmt(i_policy_m,2)+"%", f_pctl_text(p_ipol,true), p_ipol, true, "Cao=thắt hơn")
+        f_row(row_offset+1, WD_INTERBANK, f_fmt(i_ib_m,2)+"%", f_pctl_text(p_iib,true), p_iib, true, "Cao=thiếu thanh khoản")
+        f_row(row_offset+2, WD_REALRATE, f_fmt(r_real_m,2)+"%", f_pctl_text(p_rreal,true), p_rreal, true, "Policy - Dự báo Inflation")
+        f_row(row_offset+3, WD_TIGHT, f_fmt(tight_idx,2), f_pctl_text(p_tight,true), p_tight, true, "Tổng hợp (cao=thắt)")
+        f_row(row_offset+4, WD_POLICYGAP, f_fmt(policy_gap,2), f_pctl_text(p_polgap,true), p_polgap, true, "Dương=thắt quá mức")
+        row_offset += 5
+        string rate_policy = stress_high ? "⚠ THẮT CHẶT" : tight_idx < -1 ? "✅ DỄ DÃNG" : "➡ TRUNG TÍNH"
+        f_cell(row_offset, 0, "Chính sách:", color.new(color.blue,20), color.white, text.align_left)
+        color rate_color = stress_high ? color.new(color.red,60) : tight_idx < -1 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, rate_policy, rate_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 3
+        f_row(row_offset, WD_GDP, f_fmt(gdp_q,2)+"%", f_pctl_text(p_gdp,true), p_gdp, false, "Cao=tốt")
+        f_row(row_offset+1, WD_VS_TREND, f_fmt(gdp_gap_q,2), f_pctl_text(p_gdpgap,true), p_gdpgap, false, "Dương(+)=mạnh")
+        f_row(row_offset+2, "Sức mạnh", f_fmt(grow_idx,2), f_pctl_text(p_grow,true), p_grow, false, "Chỉ số (cao=tốt)")
+        row_offset += 3
+        string growth_status = growth_low ? "⚠ YẾU - Rủi ro suy thoái" : gdp_gap_q > 1 ? "✅ MẠNH - Trên tiềm năng" : "➡ ỔN ĐỊNH"
+        f_cell(row_offset, 0, "Tăng trưởng:", color.new(color.blue,20), color.white, text.align_left)
+        color growth_color = growth_low ? color.new(color.red,60) : gdp_gap_q > 1 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, growth_status, growth_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 4 and useDrivers
+        f_row(row_offset, "IDI", f_fmt(IDI,2), f_pctl_text(p_idi,true), p_idi, true, "Tổng hợp chi phí")
+        f_row(row_offset+1, "PPI (idx)", f_fmt(z_ppi_gap,2), f_pctl_text(p_zppi,true), p_zppi, true, "Cao=xấu")
+        f_row(row_offset+2, "Tỷ giá (idx)", f_fmt(z_fx_mom,2), f_pctl_text(p_zfx,true), p_zfx, true, "Cao=xấu")
+        f_row(row_offset+3, "Dầu (idx)", f_fmt(z_oil_mom,2), f_pctl_text(p_zoil,true), p_zoil, true, "Cao=xấu")
+        row_offset += 4
+        string drivers_status = drivers_high ? "⚠ ÁP LỰC CAO - Cost-push inflation" : IDI < -0.5 ? "✅ THUẬN LỢI" : "➡ TRUNG TÍNH"
+        f_cell(row_offset, 0, "Chi phí đầu vào:", color.new(color.blue,20), color.white, text.align_left)
+        color drivers_color = drivers_high ? color.new(color.red,60) : IDI < -0.5 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, drivers_status, drivers_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 5 and useYieldCurve
+        f_row(row_offset, WD_SLOPE, f_fmt(yc_slope_m,2)+" bp", f_pctl_text(p_yc,true), p_yc, false, "Âm=đảo ngược")
+        f_row(row_offset+1, "YC (idx)", f_fmt(yc_idx,2), f_pctl_text(p_ycidx,true), p_ycidx, true, "Bất thường")
+        f_row(row_offset+2, "Intl Diff", f_fmt(intl_yield_diff,2)+" bp", f_pctl_text(p_intl,true), p_intl, true, "Thấp=xấu")
+        f_row(row_offset+3, "L-S Spread", f_fmt(long_short_spread,2)+" bp", f_pctl_text(p_spread,true), p_spread, true, "Thấp=xấu")
+        row_offset += 4
+        string yc_status = curve_inversion ? "⚠ ĐẢO NGƯỢC - Recession risk" : yc_slope_m > 1 ? "✅ BÌNH THƯỜNG" : "➡ PHẲNG"
+        f_cell(row_offset, 0, "Đường cong lãi suất:", color.new(color.blue,20), color.white, text.align_left)
+        color yc_color = curve_inversion ? color.new(color.red,60) : yc_slope_m > 1 ? color.new(color.green,60) : color.new(color.orange,60)
+        f_cell(row_offset, 1, yc_status, yc_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 6
+        f_row(row_offset, WD_RISK, f_fmt(risk_pct,2)+"%", f_pctl_text(p_risk,true), p_risk, true, "Cao=nhiều áp lực")
+        f_row(row_offset+1, "Lạm phát (phần)", f_fmt(S_infl,2), f_pctl_text(p_sinfl,true), p_sinfl, true, "Đóng góp P1")
+        f_row(row_offset+2, "Lãi suất (phần)", f_fmt(S_pol,2), f_pctl_text(p_spol,true), p_spol, true, "Đóng góp P2")
+        f_row(row_offset+3, "Tăng trưởng (phần)", f_fmt(S_grow,2), f_pctl_text(p_sgrow,true), p_sgrow, true, "Yếu → rủi ro")
+        f_row(row_offset+4, "Layer 1", f_fmt(layer1_score,2), f_pctl_text(p_layer1,true), p_layer1, true, "Thanh khoản")
+        f_row(row_offset+5, "Layer 2", f_fmt(layer2_score,2), f_pctl_text(p_layer2,true), p_layer2, true, "Chu kỳ")
+        f_row(row_offset+6, "Layer 3", f_fmt(layer3_score,2), f_pctl_text(p_layer3,true), p_layer3, true, "Quốc tế")
+        row_offset += 7
+        string risk_interpretation = risk_pct > 70 ? "⚠ RỦI RO RẤT CAO - Phòng thủ" : risk_pct > 50 ? "⚠ RỦI RO CAO - Thận trọng" : risk_pct < 30 ? "✅ RỦI RO THẤP - Cơ hội" : "➡ TRUNG TÍNH"
+        f_cell(row_offset, 0, "Đánh giá:", color.new(color.blue,20), color.white, text.align_left)
+        color risk_interp_color = risk_pct > 70 ? color.new(color.red,60) : risk_pct > 50 ? color.new(color.orange,60) : risk_pct < 30 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, risk_interpretation, risk_interp_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 8
+        f_row(row_offset, WD_SLOPE, f_fmt(us_slope_m,2)+" bp", f_pctl_text(p_usyc,true), p_usyc, false, "Âm=đảo ngược")
+        f_row(row_offset+1, "US YC (idx)", f_fmt(us_idx,2), f_pctl_text(p_usycidx,true), p_usycidx, true, "Bất thường")
+        f_row(row_offset+2, "US 10Y", f_fmt(us10y_m,2)+"%", "-", na, false, "Lãi suất dài hạn Mỹ")
+        f_row(row_offset+3, "VN-US 10Y", f_fmt(intl_yield_diff,2)+" bp", f_pctl_text(p_intl,true), p_intl, true, "Chênh lệch quốc tế")
+        row_offset += 4
+        string us_yc_status = us_slope_m < 0 ? "⚠ ĐẢO NGƯỢC - Mỹ recession risk" : "✅ BÌNH THƯỜNG"
+        f_cell(row_offset, 0, "Trạng thái US:", color.new(color.blue,20), color.white, text.align_left)
+        f_cell(row_offset, 1, us_yc_status, us_slope_m < 0 ? color.new(color.red,60) : color.new(color.green,60), color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+    else if panel == 9 or panel == 10
+        f_row(row_offset, WD_RISK, f_fmt(risk_pct,2)+"%", f_pctl_text(p_risk,true), p_risk, true, "Cao=nhiều áp lực")
+        f_row(row_offset+1, WD_RISK_FORECAST, f_fmt(risk_forecast,2)+"%", f_pctl_text(p_risk_forecast,true), p_risk_forecast, true, "Dự báo xu hướng")
+        f_row(row_offset+2, "Regime", f_bucket_label(current_bucket), WD_KXH, na, true, "Chế độ thị trường")
+        f_row(row_offset+3, "Xu hướng 12M", macro_improving ? "CẢI THIỆN ✅" : macro_deteriorating ? "XẤU ĐI ⚠" : "ỔN ĐỊNH", "-", na, false, "Hướng vĩ mô")
+        row_offset += 4
+        string forecast_guide = risk_forecast > risk_pct + 10 ? "⚠ CẢNH BÁO - Risk tăng mạnh" : risk_forecast < risk_pct - 10 ? "✅ TÍCH CỰC - Risk giảm" : "➡ ỔN ĐỊNH"
+        f_cell(row_offset, 0, "Triển vọng:", color.new(color.blue,20), color.white, text.align_left)
+        color forecast_color = risk_forecast > risk_pct + 10 ? color.new(color.red,60) : risk_forecast < risk_pct - 10 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, forecast_guide, forecast_color, color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+
+    // RECOMMENDATIONS
+    row_offset += 8
+    f_hdr(row_offset, "KHUYẾN NGHỊ ĐẦU TƯ")
+
+    string rec_short = ""
+    string rec_mid = ""
+    string rec_long = ""
+
+    if bullish_divergence and is_cheap
+        rec_short := "⭐ GOM HÀNG: Phân kỳ tích cực + Giá rẻ"
+        rec_mid := "Tích lũy dần, DCA theo nhịp điều chỉnh"
+        rec_long := "Nắm giữ dài hạn, chờ vĩ mô cải thiện"
+    else if current_bucket >= 3 and not is_cheap
+        rec_short := "PHÒNG THỦ: Giảm tỷ trọng equity"
+        rec_mid := "Chờ điều chỉnh mạnh hoặc vĩ mô cải thiện"
+        rec_long := "Hedge FX + Vàng"
+    else if macro_improving
+        rec_short := "TĂNG DẦN: Vĩ mô đang cải thiện"
+        rec_mid := "Mua dip chọn lọc"
+        rec_long := "Dài hạn tích cực"
+    else
+        rec_short := "CÂN BẰNG: Giữ vị thế hiện tại"
+        rec_mid := "Theo dõi Risk Forecast"
+        rec_long := "Tái cân bằng định kỳ"
+
+    f_cell(row_offset+1,0,"Ngắn hạn",color.new(color.blue,20),color.white,text.align_left)
+    f_cell(row_offset+1,1,rec_short,color.new(color.black,10),color.white,text.align_left)
+    table.merge_cells(t, 1, row_offset+1, 3, row_offset+1)
+
+    f_cell(row_offset+2,0,"Trung hạn",color.new(color.blue,20),color.white,text.align_left)
+    f_cell(row_offset+2,1,rec_mid,color.new(color.black,10),color.white,text.align_left)
+    table.merge_cells(t, 1, row_offset+2, 3, row_offset+2)
+
+    f_cell(row_offset+3,0,"Dài hạn",color.new(color.blue,20),color.white,text.align_left)
+    f_cell(row_offset+3,1,rec_long,color.new(color.black,10),color.white,text.align_left)
+    table.merge_cells(t, 1, row_offset+3, 3, row_offset+3)
