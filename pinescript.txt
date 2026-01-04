@@ -7,24 +7,28 @@ indicator("MacroAcademic - VN Economy Engine v5.0 [Enhanced]", shorttitle="Macro
 panelOption = input.string(defval = "Inflation", title = "Panel đang xem", options = ["Inflation", "Interbank - Policy Rate", "GDP", "Inflation Driver Index", "VN Yield Curve", "RiskScore", "Credit Growth", "US Yield Curve", "Long-Term Forecast", "Market Regime Map", "Valuation & Divergence"], tooltip = "Chọn panel để hiển thị | Mỗi instance script = 1 panel")
 
 panel = switch panelOption
-    "Inflation"                    => 1
-    "Interbank - Policy Rate"      => 2
-    "GDP"                          => 3
-    "Inflation Driver Index"       => 4
-    "VN Yield Curve"               => 5
     "RiskScore"                    => 6
-    "Credit Growth"                => 7
+    "Valuation & Divergence"       => 11
+
+    "Interbank - Policy Rate"      => 2
     "US Yield Curve"               => 8
+
+    "Inflation"                    => 1
+    "VN Yield Curve"               => 5
+    "Credit Growth"                => 7
+
+    "Inflation Driver Index"       => 4
+    "GDP"                          => 3
     "Long-Term Forecast"           => 9
     "Market Regime Map"            => 10
-    "Valuation & Divergence"       => 11
+
     => 1
 
 robustMode  = input.string("Shock-sensitive", "Robust mode", options=["Shock-sensitive","Fully-robust MAD"])
 threshold_mode = input.string("Static", "Che do nguong", options = ["Static", "Dynamic (z-score)", "Percentile-based"])
 calibration_preset = input.string("Balanced", "Calibration Preset", options=["Aggressive", "Balanced", "Conservative"], tooltip="Aggressive: nhạy hơn (90/10), Balanced: 85/15, Conservative: 80/20")
 
-useDrivers     = input.bool(true,  "Bat Drivers (PPI+FX+Oil)")
+useDrivers     = input.bool(false,  "Bat Drivers (PPI+FX+Oil)")
 useYieldCurve  = input.bool(true,  "Bat Yield curve (VN10Y-VN02Y)")
 useExternalBOT = input.bool(false, "Them BOT (can can thuong mai)")
 useCredit      = input.bool(true,  "Bat Credit Growth (M2)")
@@ -373,10 +377,14 @@ f_pi_ensemble_expect(float src) =>
 
 float pi_m       = f_sec(sym_infl, "M", close)
 float pi_trend_m = f_sec(sym_infl, "M", f_pi_trend(close))
-float pi_gap_m   = pi_m - pi_trend_m
 float dpi_m      = f_sec(sym_infl, "M", close - close[1])
 float pi_e_m     = f_sec(sym_infl, "M", f_pi_ensemble_expect(close))
 float surprise_m = f_sec(sym_infl, "M", close - f_pi_ensemble_expect(close))
+float pi_gap_m   = pi_m - pi_trend_m
+
+
+
+
 
 // =====================================================
 // G) CREDIT GROWTH (M2)
@@ -491,17 +499,17 @@ float vn10y_m = na
 float vn02y_m = na
 float yc_slope_m = na
 float yc_idx = na
-
-if useYieldCurve
-    vn10y_m := f_sec(sym_vn10y, "M", close)
-    vn02y_m := f_sec(sym_vn02y, "M", close)
-    yc_slope_m := vn10y_m - vn02y_m
-    yc_idx := f_z(yc_slope_m, 60, 2.5)
-
 float us10y_m = f_sec(sym_us10y, "M", close)
 float us02y_m = f_sec(sym_us02y, "M", close)
 float us_slope_m = us10y_m - us02y_m
 float us_idx = f_z(us_slope_m, 60, 2.5)
+
+if useYieldCurve
+    vn10y_m := f_sec(sym_vn10y, "M", close)
+    vn02y_m := f_sec(sym_vn02y, "M", close)
+    yc_slope_m := math.min(vn10y_m - vn02y_m, us10y_m - us02y_m)
+    yc_idx := f_z(yc_slope_m, 60, 2.5)
+
 
 float intl_yield_diff = na
 float long_short_spread = na
@@ -950,6 +958,7 @@ plot(showPlots and panel==2 ? tight_idx  : na, "P2 TightIdx", style=plot.style_a
 plot(showPlots and panel==2 ? i_policy_m : na, "P2 Policy", linewidth=2, trackprice=true, color=color.black)
 plot(showPlots and panel==2 ? i_ib_m     : na, "P2 IB",     linewidth=2, trackprice=true, color=color.red)
 plot(showPlots and panel==2 ? vn10y_m : na, "P2 VN 10Y", linewidth=1, color=color.lime)
+plot(showPlots and panel==2 ? vn02y_m : na, "P2 VN 02Y", linewidth=1, color=color.yellow)
 
 plot(showPlots and panel==3 ? gdp_gap_q   : na, "P3 GDP gap", style=plot.style_area, color=color.new(color.purple, 80))
 plot(showPlots and panel==3 ? gdp_q       : na, "P3 GDP", linewidth=2, trackprice=true, color=color.black)
@@ -970,8 +979,10 @@ plot(showPlots and panel==7 ? m2_yoy_m : na, "P7 M2 YoY", linewidth=2, trackpric
 plot(showPlots and panel==8 ? us_idx     : na, "P8 US YC idx", style=plot.style_area, color=color.new(color.gray, 80))
 plot(showPlots and panel==8 ? us_slope_m : na, "P8 US YC slope", linewidth=2, trackprice=true, color=color.black)
 plot(showPlots and panel==8 ? us10y_m : na, "P8 US 10Y", linewidth=2, color=color.rgb(120, 247, 10))
-plot(showPlots and panel==8 ? us02y_m : na, "P8 US 02Y", linewidth=2, color=color.yellow)
 plot(showPlots and panel==8 ? vn10y_m : na, "P8 VN 10Y", linewidth=1, color=color.rgb(247, 18, 10))
+plot(showPlots and panel==8 ? us02y_m : na, "P8 US 02Y", linewidth=1, color=color.yellow)
+
+
 
 plot(showPlots and (panel==5 or panel==8) ? intl_yield_diff : na, "Intl Yield Diff", linewidth=1, color=color.blue)
 plot(showPlots and (panel==5 or panel==8) ? long_short_spread : na, "Long-Short Spread", linewidth=1, color=color.green)
@@ -990,16 +1001,6 @@ plot(showPlots and panel==11 ? risk_pct : na, "P11 Risk %", linewidth=2, color=c
 hline(showPlots and panel==11 ? valuation_discount * 100 : na, "Cheap Threshold", color=color.green, linestyle=hline.style_dashed)
 
 plotshape(showPlots and panel==11 and bullish_divergence, "Bullish Divergence", shape.labelup, location.bottom, color.green, text="BUY?", textcolor=color.white, size=size.small)
-
-// =====================================================
-// P) ALERTS
-// =====================================================
-alertcondition(risk_pct > 60, title="High Risk Alert", message="Risk PCT > 60% - Phong thu!")
-alertcondition(bullish_divergence, title="Bullish Divergence", message="PHAN KY TICH CUC - Gia xuong, Rui ro giam!")
-alertcondition(macro_improving, title="Macro Improving", message="Vi mo bat dau cai thien - Forecast 12 thang < Current Risk")
-alertcondition(macro_deteriorating, title="Macro Deteriorating", message="Vi mo dang xau di - Forecast 12 thang > Current Risk")
-alertcondition(useDXY and dxy_m > dxy_threshold and i_ib_m > i_ib_m[1], title="DXY + IB Stress", message="DXY cao + Lai lien ngan hang tang - Canh bao ty gia!")
-alertcondition(useValuation and is_cheap and risk_pct > 60, title="Cheap Valuation Alert", message="Gia RE (< MA200*80%) nhung vi mo xau - Co hoi gom hang!")
 
 // =====================================================
 // T) TABLE DISPLAY
@@ -1027,15 +1028,85 @@ f_row(int r, string metric, string value, string pctl, float p, bool highbad, st
     f_cell(r, 2, pctl,   p_bg, color.black, text.align_center)
     f_cell(r, 3, meaning,bg, color.white, text.align_left)
 
+
+
+// --- KHAI BÁO BIẾN TRẠNG THÁI ---
+var float entry_price = na
+var float stop_loss = na
+var float take_profit = na
+
+// Khởi tạo biến action cho mỗi thanh nến, mặc định là "wait"
+string action = "wait"
+
+// --- LOGIC TÍN HIỆU ĐẦU VÀO (INPUT SIGNALS) ---
+// Giả định bạn đã có các biến bullish_divergence, is_cheap, risk_pct, macro_improving, vnindex_m từ trước
+bool strong_buy = bullish_divergence and is_cheap and risk_pct < 50
+bool weak_buy   = macro_improving and risk_pct < 40 and not is_cheap
+
+// --- XỬ LÝ LOGIC TRẠNG THÁI (STATE MACHINE) ---
+
+// 1. Kiểm tra nếu ĐANG CÓ LỆNH (Position Open)
+if not na(entry_price)
+    // Kiểm tra Cắt lỗ (Stop Loss)
+    // Lưu ý: Dùng low hoặc vnindex_m tùy vào việc bạn muốn check giá râu nến hay giá đóng cửa
+    if vnindex_m <= stop_loss
+        action := "stop_loss"
+        entry_price := na
+        stop_loss := na
+        take_profit := na
+
+    // Kiểm tra Chốt lời (Take Profit)
+    else if vnindex_m >= take_profit
+        action := "take_profit"
+        entry_price := na
+        stop_loss := na
+        take_profit := na
+
+    // Kiểm tra Tín hiệu thoát lệnh do rủi ro (Risk Exit)
+    else if risk_pct > 70
+        action := "risk_exit" // Thoát do rủi ro cao
+        entry_price := na
+        stop_loss := na
+        take_profit := na
+
+    // Nếu không chạm điều kiện nào ở trên -> Tiếp tục giữ (Hold)
+    else
+        action := "hold"
+
+// 2. Kiểm tra nếu CHƯA CÓ LỆNH (No Position)
+// Dùng 'else' để đảm bảo không mua ngay lập tức sau khi vừa bán trong cùng 1 nến (tùy chọn)
+else
+    if strong_buy
+        action := "strong_buy"
+        entry_price := vnindex_m
+        stop_loss := entry_price * 0.92   // 8% stop
+        take_profit := entry_price * 1.25 // 25% target
+
+    else if weak_buy
+        action := "weak_buy"
+        entry_price := vnindex_m
+        stop_loss := entry_price * 0.95   // Ví dụ: weak buy stop loss chặt hơn (5%)
+        take_profit := entry_price * 1.10 // Target nhỏ hơn
+
+// --- HIỂN THỊ KẾT QUẢ (VISUALIZATION) ---
+
+
+
+
 if barstate.islast
     table.set_position(t, f_tbl_pos())
+
+
+
+
+
 
     // HEADER with Valuation & Divergence status
     string valuation_txt = useValuation ? (is_cheap ? " | GIÁ RẺ ✓" : " | GIÁ ĐẮT") : ""
     string divergence_txt = bullish_divergence ? " | PHÂN KỲ TÍCH CỰC ⬆" : ""
     string macro_status = macro_improving ? " | VI MÔ CẢI THIỆN ✓" : macro_deteriorating ? " | VI MÔ XẤU ĐI ⚠" : ""
 
-    string head_txt = f_bucket_label(risk_bucket) + " | Risk " + f_fmt(risk_pct,1) + "% → " + f_fmt(risk_forecast,1) + "%" + valuation_txt + divergence_txt + macro_status
+    string head_txt = f_bucket_label(risk_bucket) + " | Risk " + f_fmt(risk_pct,1) + "% → " + f_fmt(risk_forecast,1) + "%" + valuation_txt + divergence_txt + macro_status +"|" + action
     color head_bg = f_bucket_bg(risk_bucket)
     f_cell(0, 0, head_txt, head_bg, color.black, text.align_center)
     table.merge_cells(t, 0, 0, 3, 0)
@@ -1093,13 +1164,13 @@ if barstate.islast
     // LAYERS
     row_offset += 5
     f_cell(row_offset, 0, "Layer 1: Funding/Liquidity", color.new(color.blue,20), color.white, text.align_left)
-    f_cell(row_offset, 1, f_fmt(layer1_score,1), color.new(color.black,0), color.white, text.align_right)
+    f_cell(row_offset, 1, f_fmt(layer1_score,1) +" / 2.5", color.new(color.black,0), color.white, text.align_right)
 
     f_cell(row_offset+1, 0, "Layer 2: Cycle/Growth", color.new(color.blue,20), color.white, text.align_left)
-    f_cell(row_offset+1, 1, f_fmt(layer2_score,1), color.new(color.black,0), color.white, text.align_right)
+    f_cell(row_offset+1, 1, f_fmt(layer2_score,1) +" / 5", color.new(color.black,0), color.white, text.align_right)
 
     f_cell(row_offset+2, 0, "Layer 3: External/Inflation", color.new(color.blue,20), color.white, text.align_left)
-    f_cell(row_offset+2, 1, f_fmt(layer3_score,1), color.new(color.black,0), color.white, text.align_right)
+    f_cell(row_offset+2, 1, f_fmt(layer3_score,1) +" / 6", color.new(color.black,0), color.white, text.align_right)
 
     // SCENARIO - ENHANCED
     row_offset += 3
@@ -1195,7 +1266,7 @@ if barstate.islast
         f_row(row_offset+3, WD_MOM, f_fmt(dpi_m,2), f_pctl_text(p_dpi,true), p_dpi, true, "Tháng này vs tháng trước")
         f_row(row_offset+4, WD_SURPRISE, f_fmt(surprise_m,2), f_pctl_text(p_sur,true), p_sur, true, "Dương(+)=cao hơn dự đoán")
         row_offset += 5
-        string infl_trend = pi_m > pi_e_m ? "📈 Cao hơn dự báo" : pi_m < pi_e_m - 0.5 ? "📉 Thấp hơn dự báo" : "➡ Đúng dự báo"
+        string infl_trend = pi_m > pi_e_m ? "📈 Cao hơn dự báo: Cảnh báo tăng lãi suất " : pi_m < pi_e_m - 0.5 ? "📉 Thấp hơn dự báo: Kỳ vọng nới lỏng" : "➡ Đúng dự báo"
         f_cell(row_offset, 0, "Xu hướng:", color.new(color.blue,20), color.white, text.align_left)
         f_cell(row_offset, 1, infl_trend, color.new(color.black,10), color.white, text.align_left)
         table.merge_cells(t, 1, row_offset, 3, row_offset)
@@ -1235,10 +1306,10 @@ if barstate.islast
     else if panel == 5 and useYieldCurve
         f_row(row_offset, WD_SLOPE, f_fmt(yc_slope_m,2)+" bp", f_pctl_text(p_yc,true), p_yc, false, "Âm=đảo ngược")
         f_row(row_offset+1, "YC (idx)", f_fmt(yc_idx,2), f_pctl_text(p_ycidx,true), p_ycidx, true, "Bất thường")
-        f_row(row_offset+2, "Intl Diff", f_fmt(intl_yield_diff,2)+" bp", f_pctl_text(p_intl,true), p_intl, true, "Thấp=xấu")
-        f_row(row_offset+3, "L-S Spread", f_fmt(long_short_spread,2)+" bp", f_pctl_text(p_spread,true), p_spread, true, "Thấp=xấu")
+        f_row(row_offset+2, "Intl Diff", f_fmt(intl_yield_diff,2)+" bp", f_pctl_text(p_intl,true), p_intl, true,intl_yield_diff < 0.5 ? "Lợi suất VN không còn hấp dẫn" : "Thấp=xấu")
+        f_row(row_offset+3, "L-S Spread", f_fmt(long_short_spread,2)+" bp", f_pctl_text(p_spread,true), p_spread, true, long_short_spread < 0.5 ? "Term premium thu hẹp → rủi ro" : "Thấp=xấu")
         row_offset += 4
-        string yc_status = curve_inversion ? "⚠ ĐẢO NGƯỢC - Recession risk" : yc_slope_m > 1 ? "✅ BÌNH THƯỜNG" : "➡ PHẲNG"
+        string yc_status = curve_inversion ? "⚠ ĐẢO NGƯỢC - Recession risk cao" : yc_slope_m > 1 ? "✅ BÌNH THƯỜNG Kỳ vọng tăng trưởng tốt" : "➡ PHẲNG"
         f_cell(row_offset, 0, "Đường cong lãi suất:", color.new(color.blue,20), color.white, text.align_left)
         color yc_color = curve_inversion ? color.new(color.red,60) : yc_slope_m > 1 ? color.new(color.green,60) : color.new(color.orange,60)
         f_cell(row_offset, 1, yc_status, yc_color, color.white, text.align_left)
