@@ -4,22 +4,102 @@
 
 ## 📋 MỤC LỤC
 
-**PHẦN 1: TỔNG QUAN HỆ THỐNG**
-- 1.1 Kiến trúc 10 panels
-- 1.2 Workflow sử dụng
-- 1.3 Các khái niệm cơ bản
+### PHẦN 1: TỔNG QUAN HỆ THỐNG
+- [1.1 Kiến trúc 10 panels](#11-kiến-trúc-10-panels)
+- [1.2 Workflow sử dụng chuẩn](#12-workflow-sử-dụng-chuẩn)
+- [1.3 Các khái niệm cơ bản (Glossary)](#13-các-khái-niệm-cơ-bản-glossary)
 
-**PHẦN 2-11: CHI TIẾT TỪNG PANEL**
-- Panel 1: Inflation (Lạm phát)
-- Panel 2: Rates & Liquidity (Lãi suất & Thanh khoản)
-- Panel 3: GDP Growth (Tăng trưởng)
-- Panel 4: Yield Curve Analysis (Đường cong lợi suất VN)
-- Panel 5: RiskScore & Forecast (Điểm rủi ro & Dự báo)
-- Panel 6: Credit Growth (Tăng trưởng tín dụng)
-- Panel 7: Valuation & Divergence (Định giá & Phân kỳ)
-- Panel 8: Policy Pressure (Áp lực chính sách)
-- Panel 9: Market & Sector (Thị trường & Ngành)
-- Panel 10: US Yield Curve (Đường cong lợi suất Mỹ)
+### PHẦN 2-11: CHI TIẾT TỪNG PANEL
+
+#### Panel 1: Inflation (Lạm phát)
+- [2.1 Mục tiêu Panel](#21-mục-tiêu-panel)
+- [2.2 Cấu trúc bảng Dashboard](#22-cấu-trúc-bảng-dashboard)
+- [2.3 Giải thích từng chỉ số](#23-giải-thích-từng-chỉ-số)
+- [2.4 TRẠNG THÁI (State Classification)](#24-trạng-thái-state-classification)
+- [2.5 Case Studies - Ví dụ thực tế](#25-case-studies---ví-dụ-thực-tế)
+- [2.6 Decision Matrix - Ma trận quyết định](#26-decision-matrix---ma-trận-quyết-định)
+- [2.7 Checklist - Đánh giá nhanh Panel 1](#27-checklist---đánh-giá-nhanh-panel-1)
+
+#### Panel 2: Rates & Liquidity (Lãi suất & Thanh khoản)
+- [3.1 Mục tiêu Panel](#31-mục-tiêu-panel)
+- [3.2 Cấu trúc Dashboard](#32-cấu-trúc-dashboard)
+- [3.3 Biểu đồ (Panel 2 Plot)](#33-biểu-đồ-panel-2-plot)
+- [3.4 Giải thích từng chỉ số](#34-giải-thích-từng-chỉ-số)
+- [3.5 Case Studies - Ví dụ thực tế](#35-case-studies---ví-dụ-thực-tế)
+- [3.6 Decision Matrix](#36-decision-matrix)
+- [3.7 Checklist Panel 2](#37-checklist-panel-2)
+
+#### Panel 3: GDP Growth (Tăng trưởng)
+- [4.1 Mục tiêu Panel](#41-mục-tiêu-panel)
+- [4.2 Cấu trúc Dashboard](#42-cấu-trúc-dashboard)
+- [4.3 Các chỉ số chi tiết](#43-các-chỉ-số-chi-tiết)
+- [4.4 Case Studies](#44-case-studies)
+- [4.5 Decision Matrix](#45-decision-matrix)
+- [4.6 Checklist Panel 3](#46-checklist-panel-3)
+
+#### Panel 4: Yield Curve Analysis (Đường cong lợi suất VN)
+- [5.1 Mục tiêu Panel](#51-mục-tiêu-panel)
+- [5.2 Cấu trúc Dashboard](#52-cấu-trúc-dashboard)
+- [5.3 Giải thích chi tiết](#53-giải-thích-chi-tiết)
+- [5.4 Case Studies](#54-case-studies)
+- [5.5 Decision Matrix](#55-decision-matrix)
+- [5.6 Checklist Panel 4](#56-checklist-panel-4)
+
+#### Panel 5: RiskScore & Forecast (Điểm rủi ro & Dự báo)
+- [6.1 Mục tiêu Panel](#61-mục-tiêu-panel)
+- [6.2 Cấu trúc Dashboard](#62-cấu-trúc-dashboard)
+- [6.3 Các chỉ số chi tiết](#63-các-chỉ-số-chi-tiết)
+- [6.4 Case Studies](#64-case-studies)
+- [6.5 Decision Matrix](#65-decision-matrix)
+- [6.6 Checklist Panel 5](#66-checklist-panel-5)
+
+#### Panel 6: Credit Growth (Tăng trưởng tín dụng)
+- [7.1 Mục tiêu Panel](#71-mục-tiêu-panel)
+- [7.2 Cấu trúc Dashboard](#72-cấu-trúc-dashboard)
+- [7.3 Giải thích chi tiết](#73-giải-thích-chi-tiết)
+- [7.4 Case Studies](#74-case-studies)
+- [7.5 Decision Matrix](#75-decision-matrix)
+- [7.6 Checklist Panel 6](#76-checklist-panel-6)
+
+#### Panel 7: Valuation & Divergence (Định giá & Phân kỳ)
+- [8.1 Mục tiêu Panel](#81-mục-tiêu-panel)
+- [8.2 Cấu trúc Dashboard](#82-cấu-trúc-dashboard)
+- [8.3 Giải thích chi tiết](#83-giải-thích-chi-tiết)
+- [8.4 Case Studies](#84-case-studies)
+- [8.5 Decision Matrix](#85-decision-matrix)
+- [8.6 Checklist Panel 7](#86-checklist-panel-7)
+
+#### Panel 8: Policy Pressure (Áp lực chính sách)
+- [9.1 Mục tiêu Panel](#91-mục-tiêu-panel)
+- [9.2 Cấu trúc Dashboard](#92-cấu-trúc-dashboard)
+- [9.3 Giải thích chi tiết](#93-giải-thích-chi-tiết)
+- [9.4 Case Studies](#94-case-studies)
+- [9.5 Decision Matrix](#95-decision-matrix)
+- [9.6 Checklist Panel 8](#96-checklist-panel-8)
+
+#### Panel 9: Market & Sector (Thị trường & Ngành)
+- [10.1 Mục tiêu Panel](#101-mục-tiêu-panel)
+- [10.2 Cấu trúc Dashboard](#102-cấu-trúc-dashboard)
+- [10.3 Giải thích chi tiết](#103-giải-thích-chi-tiết)
+- [10.4 Case Studies](#104-case-studies)
+- [10.5 Decision Matrix](#105-decision-matrix)
+- [10.6 Checklist Panel 9](#106-checklist-panel-9)
+
+#### Panel 10: US Yield Curve (Đường cong lợi suất Mỹ)
+- [11.1 Mục tiêu Panel](#111-mục-tiêu-panel)
+- [11.2 Cấu trúc Dashboard](#112-cấu-trúc-dashboard)
+- [11.3 Giải thích chi tiết](#113-giải-thích-chi-tiết)
+- [11.4 Case Studies](#114-case-studies)
+- [11.5 Decision Matrix](#115-decision-matrix)
+- [11.6 Checklist Panel 10](#116-checklist-panel-10)
+
+### PHẦN 12: TỔNG HỢP & ỨNG DỤNG THỰC TẾ
+- [12.1 Cách đọc & kết hợp 10 panels](#121-cách-đọc--kết-hợp-10-panels)
+- [12.2 Scoring System (Hệ thống chấm điểm)](#122-scoring-system-hệ-thống-chấm-điểm)
+- [12.3 Portfolio Construction (Xây dựng danh mục)](#123-portfolio-construction-xây-dựng-danh-mục)
+- [12.4 Case Study Tổng Hợp: Phân Tích 1 Ngày Cụ Thể](#124-case-study-tổng-hợp-phân-tích-1-ngày-cụ-thể)
+- [12.5 Checklist Tổng Thể: Review Hàng Tuần](#125-checklist-tổng-thể-review-hàng-tuần)
+- [12.6 Lời Khuyên Cuối: Những Điều TUYỆT ĐỐI Phải Nhớ](#126-lời-khuyên-cuối-những-điều-tuyệt-đối-phải-nhớ)
 
 ---
 

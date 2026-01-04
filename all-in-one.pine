@@ -1831,15 +1831,15 @@ f_display_transition_matrix(int offset) =>
     if show_full_transition_matrix
         // FULL 5x5 MATRIX DISPLAY
         // Header row: TO buckets
-        f_cell(row_offset, 0, "FROM→TO", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 1, "B0", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 2, "B1", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 3, "B2", color.new(color.navy,50), color.white, text.align_center)
+        f_cell(row_offset, 0, "FROM→TO", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 1, "B0", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 2, "B1", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 3, "B2", color.new(color.navy,50), color.black, text.align_center)
         row_offset += 1
 
         // Note: Due to 4-column limit, show first 3 buckets
         for from_b = 0 to 4
-            f_cell(row_offset, 0, "B" + str.tostring(from_b), color.new(color.blue,85), color.white, text.align_center)
+            f_cell(row_offset, 0, "B" + str.tostring(from_b), color.new(color.blue,85), color.black, text.align_center)
 
             for to_b = 0 to 2
                 int count = array.get(transition_matrix, from_b * 5 + to_b)
@@ -1854,21 +1854,21 @@ f_display_transition_matrix(int offset) =>
                                prob > 25 ? color.new(color.orange,80) : color.new(color.red,85)
 
                 string cell_text = count > 0 ? str.tostring(count) + "\n" + f_fmt(prob,0) + "%" : "-"
-                f_cell(row_offset, to_b + 1, cell_text, cell_bg, color.white, text.align_center)
+                f_cell(row_offset, to_b + 1, cell_text, cell_bg, color.black, text.align_center)
 
             row_offset += 1
 
         row_offset += 1
-        f_cell(row_offset, 0, "📝 Note:", color.new(color.blue,85), color.white, text.align_left)
+        f_cell(row_offset, 0, "📝 Note:", color.new(color.blue,85), color.black, text.align_left)
         f_cell(row_offset, 1, "Showing B0→B2 (Table limit 4 cols)", color.new(color.black,10), color.silver, text.align_left)
         table.merge_cells(t, 1, row_offset, 3, row_offset)
         row_offset += 1
     else
         // SIMPLIFIED 3x3 MATRIX (Original)
-        f_cell(row_offset, 0, "FROM→TO", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 1, "B0", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 2, "B1", color.new(color.navy,50), color.white, text.align_center)
-        f_cell(row_offset, 3, "B2-4", color.new(color.navy,50), color.white, text.align_center)
+        f_cell(row_offset, 0, "FROM→TO", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 1, "B0", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 2, "B1", color.new(color.navy,50), color.black, text.align_center)
+        f_cell(row_offset, 3, "B2-4", color.new(color.navy,50), color.black, text.align_center)
         row_offset += 1
 
         // Display simplified 3x3 matrix (B0, B1, B2-4)
@@ -1881,7 +1881,7 @@ f_display_transition_matrix(int offset) =>
                              (current_bucket >= 2 and from_group == 2)
             string label_text = is_current ? "▶ " + array.get(bucket_labels, from_group) : array.get(bucket_labels, from_group)
             color label_bg = is_current ? color.new(color.yellow,60) : color.new(color.blue,85)
-            f_cell(row_offset, 0, label_text, label_bg, color.white, text.align_center)
+            f_cell(row_offset, 0, label_text, label_bg, color.black, text.align_center)
 
             for to_group = 0 to 2
                 int count = 0
@@ -1912,13 +1912,13 @@ f_display_transition_matrix(int offset) =>
                 // Display count with color based on magnitude
                 color cell_bg = count == 0 ? color.new(color.gray,90) : count > 10 ? color.new(color.red,80) : count > 5 ? color.new(color.orange,85) : color.new(color.green,85)
                 string count_text = count > 0 ? str.tostring(count) : "-"
-                f_cell(row_offset, to_group + 1, count_text, cell_bg, color.white, text.align_center)
+                f_cell(row_offset, to_group + 1, count_text, cell_bg, color.black, text.align_center)
 
             row_offset += 1
 
     // Interpretation (common for both matrix types)
     row_offset += 1
-    f_cell(row_offset, 0, "💡 Giải thích:", color.new(color.purple,75), color.white, text.align_left)
+    f_cell(row_offset, 0, "💡 Giải thích:", color.new(color.purple,75), color.black, text.align_left)
 
     // Calculate stability (diagonal sum / total)
     int diagonal_sum = array.get(transition_matrix, 0) + array.get(transition_matrix, 6) + array.get(transition_matrix, 12) + array.get(transition_matrix, 18) + array.get(transition_matrix, 24)
@@ -2114,8 +2114,8 @@ f_display_scenario(int offset) =>
 
     color scenario_bg = scenario_severity == 4 ? color.new(color.green,50) : scenario_severity == 3 ? color.new(color.red,60) : scenario_severity == 2 ? color.new(color.orange,65) : scenario_severity == 1 ? color.new(color.blue,70) : color.new(color.gray,75)
     string severity_icon = scenario_severity == 4 ? "🌟 " : scenario_severity == 3 ? "🚨 " : scenario_severity == 2 ? "⚠️ " : scenario_severity == 1 ? "ℹ️ " : "➖ "
-    f_cell(row_offset, 0, "Tình huống:", color.new(color.blue,80), color.white, text.align_left)
-    f_cell(row_offset, 1, severity_icon + scenario_name, scenario_bg, color.white, text.align_left)
+    f_cell(row_offset, 0, "Tình huống:", color.new(color.blue,80), color.black, text.align_left)
+    f_cell(row_offset, 1, severity_icon + scenario_name, scenario_bg, color.black, text.align_left)
     table.merge_cells(t, 1, row_offset, 3, row_offset)
     row_offset += 1
 
@@ -2159,8 +2159,8 @@ f_display_scenario(int offset) =>
     else
         bucket_guidance := "💡 B4: Risk rất cao → Bảo toàn (15-25% equity), cash/bonds/gold"
 
-    f_cell(row_offset, 0, "Guidance:", color.new(color.purple,70), color.white, text.align_left)
-    f_cell(row_offset, 1, bucket_guidance, color.new(color.purple,85), color.white, text.align_left)
+    f_cell(row_offset, 0, "Guidance:", color.new(color.purple,70), color.black, text.align_left)
+    f_cell(row_offset, 1, bucket_guidance, color.new(color.purple,85), color.black, text.align_left)
     table.merge_cells(t, 1, row_offset, 3, row_offset)
     row_offset += 1
     row_offset
