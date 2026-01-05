@@ -43,11 +43,6 @@ gdp_clip         = input.float(2.5, "Clip (GDP)", minval=1.5, maxval=6.0, step=0
 credit_trend_len_m = input.int(24, "Trend Credit (thang)", minval=6, maxval=120)
 credit_z_len_m     = input.int(60, "Lookback Credit (thang)", minval=24, maxval=240)
 
-drv_z_len_m      = input.int(60, "Lookback drivers", minval=24, maxval=240)
-drv_clip         = input.float(2.5, "Clip (drivers)", minval=1.5, maxval=6.0, step=0.1)
-ppi_trend_len_q  = input.int(12, "Trend PPI (quy)", minval=4, maxval=40)
-ppi_z_len_q      = input.int(40, "Lookback PPI (quy)", minval=16, maxval=120)
-
 pi_target        = input.float(4.0, "Muc tieu lam phat (%)", minval=0.0, maxval=15.0, step=0.1)
 r_star           = input.float(1.0, "r* (%)", minval=-5.0, maxval=10.0, step=0.1)
 phi_pi           = input.float(0.5, "He so lam phat", minval=0.0, maxval=2.0, step=0.05)
@@ -62,7 +57,6 @@ w_intl=input.float(1.5,"Intl",minval=0,maxval=5,step=0.1)
 w_spread=input.float(1.5,"Spread",minval=0,maxval=5,step=0.1)
 w_credit=input.float(1.0,"Credit",minval=0,maxval=5,step=0.1)
 w_dxy=input.float(1.0,"DXY",minval=0,maxval=5,step=0.1)
-w_drv=input.float(1.0,"Drivers",minval=0,maxval=5,step=0.1)
 
 percentile_lookback    = input.int(504, "Chu ky phan phoi (bars)", minval=100, maxval=2000)
 clip_multiplier        = input.float(3.0, "Clip outliers (std)", minval=1.5, maxval=4.0, step=0.1)
@@ -103,6 +97,11 @@ yc_lag3 = input.int(20, "YC Research Lag #3", minval=0, maxval=252)
 yc_min_eff_ratio = input.float(0.70, "YC min effective sample ratio", minval=0.30, maxval=1.00)
 yc_ret_clip_mult = input.float(3.0, "YC VNINDEX return clip (stdev)", minval=1.0, maxval=8.0)
 yc_lag_stab_len = input.int(60, "YC BestLag stability window", minval=20, maxval=252)
+
+
+
+f_get_risk_color(float pct) =>
+    pct > 70 ? color.red : pct > 40 ? color.orange : color.green
 
 f_round(float x, int d) =>
     float m = math.pow(10.0, d)
@@ -163,8 +162,6 @@ f_mad_z(float src, int length) =>
         z := (src - med) / denom
     z
 
-// Master z-score function that respects robustMode setting
-// Used throughout the script for all z-score calculations
 f_z(float src, int length, float clip_mult) =>
     robustMode == "Fully-robust MAD" ? f_mad_z(src, length) : f_winsor_z(src, length, clip_mult)
 
@@ -323,6 +320,29 @@ f_row(int r, string metric, string value, string pctl, float p, bool highbad, st
     f_cell(r, 1, value,  bg, color.white, text.align_right)
     f_cell(r, 2, pctl,   p_bg, color.black, text.align_center)
     f_cell(r, 3, meaning,bg, color.white, text.align_left)
+
+// Display helper: Key-Value row (merged across columns)
+f_kv_row(int r, string key, string value, color key_bg, color val_bg) =>
+    f_cell(r, 0, key, key_bg, color.white, text.align_left)
+    f_cell(r, 1, value, val_bg, color.white, text.align_center)
+    table.merge_cells(t, 1, r, 3, r)
+
+// Display helper: 2x2 grid row
+f_grid_row(int r, string k1, string v1, string k2, string v2, color bg) =>
+    f_cell(r, 0, k1, bg, color.white, text.align_left)
+    f_cell(r, 1, v1, bg, color.white, text.align_center)
+    f_cell(r, 2, k2, bg, color.white, text.align_left)
+    f_cell(r, 3, v2, bg, color.white, text.align_center)
+
+// Display helper: Layer score with percentage
+f_layer_display(int r, string name, float score, float max_score) =>
+    float pct = max_score > 0 ? score / max_score * 100.0 : 0.0
+    color col = f_get_risk_color(pct)
+    f_cell(r, 0, name, color.new(color.blue, 80), color.black, text.align_left)
+    f_cell(r, 1, f_fmt(score,1), col, color.black, text.align_center)
+    f_cell(r, 2, "/" + f_fmt(max_score,1), color.gray, color.silver, text.align_left)
+    f_cell(r, 3, f_fmt(pct,1) + "%", col, color.white, text.align_left)
+
 f_yc_display_lsc(table t, int row_offset, float level, float slope, float curve, float level_change, float slope_ma, float slope_z) =>
     int r = row_offset
     f_cell(r, 0, "LSC FACTORS", color.new(color.navy,50), color.white, text.align_center)
@@ -536,8 +556,6 @@ float us10y_m = f_sec(sym_us10y, "M", close)
 float us02y_m = f_sec(sym_us02y, "M", close)
 float us_yc_slope = us10y_m - us02y_m
 
-
-
 vn10y_m = f_sec(sym_vn10y, "M", close)
 vn02y_m = f_sec(sym_vn02y, "M", close)
 yc_slope_m = math.min(vn10y_m - vn02y_m, us_yc_slope)
@@ -571,7 +589,6 @@ if use_yc_lab
     yc_slope := vn10y_d - vn02y_d
     yc_curve := 2.0 * vn05y_d - vn02y_d - vn10y_d
 
-    // Robust z-scores for each tenor (respects robustMode: Shock-sensitive or Fully-robust MAD)
     float y2_z = f_z(vn02y_d, yc_stats_len, yc_clip_mult)
     float y5_z = f_z(vn05y_d, yc_stats_len, yc_clip_mult)
     float y10_z = f_z(vn10y_d, yc_stats_len, yc_clip_mult)
@@ -659,20 +676,26 @@ if use_yc_research
             yc_vnx_r2_best:=yc_vnx_corr_lag3*yc_vnx_corr_lag3
 
         // Track best lag for stability calculation
-        array.push(yc_lag_hist, yc_best_lag)
-        if array.size(yc_lag_hist) > yc_lag_stab_len
-            array.shift(yc_lag_hist)
+        if not na(yc_best_lag)
+            array.push(yc_lag_hist, yc_best_lag)
+            if array.size(yc_lag_hist) > yc_lag_stab_len
+                array.shift(yc_lag_hist)
 
-        // Calculate lag stability (% of time best lag is consistent)
-        if array.size(yc_lag_hist) >= yc_lag_stab_len
-            int stable_count = 0
-            int mode_lag = yc_best_lag
-            for i = 0 to array.size(yc_lag_hist) - 1
-                if array.get(yc_lag_hist, i) == mode_lag
-                    stable_count += 1
-            yc_lag_stability := 100.0 * stable_count / array.size(yc_lag_hist)
+        // Finds the most frequent lag among all candidates across history
+        if array.size(yc_lag_hist) >= math.min(yc_lag_stab_len, 30)
+            int ml = yc_lag1
+            int mc = 0
+            for tl in array.from(yc_lag1, yc_lag2, yc_lag3)
+                int tc = 0
+                for i = 0 to array.size(yc_lag_hist) - 1
+                    if array.get(yc_lag_hist, i) == tl
+                        tc += 1
+                if tc > mc
+                    mc := tc
+                    ml := tl
+            yc_lag_stability := mc * 100.0 / array.size(yc_lag_hist)
 
-        // Regime-filtered research (OKQ: Only OK Quality)
+        // Regime-filtered research
         if yc_quality_label != "LOWQ"
             int okq_cnt = 0
             float okq_sum_xy = 0.0
@@ -712,7 +735,7 @@ if use_yc_research
 
 
 float us_level = (us02y_m + us10y_m) / 2.0
-float us_curve = us02y_m - 2 * ((us02y_m + us10y_m) / 2.0) + us10y_m  // Approximation with 2 tenors
+float us_curve = us02y_m - 2 * ((us02y_m + us10y_m) / 2.0) + us10y_m
 
 float us_slope_ma = ta.sma(us_yc_slope, 60)
 float us_slope_std = ta.stdev(us_yc_slope, 60)
@@ -741,9 +764,6 @@ float fx_return_21 = na(fx_rate_d) or na(fx_rate_d[21]) ? na : ((fx_rate_d - fx_
 float fx_vol_3m = ta.stdev(fx_return_21, 63)
 float fx_yoy_abs = math.abs(fx_yoy_change)
 
-
-
-
 // N) VALUATION CHECK
 
 float vnindex_d = na
@@ -756,7 +776,6 @@ if useValuation
     vnindex_ma200 := f_sec(sym_vnindex, "D", ta.sma(close, 200))
     valuation_distance := vnindex_d / vnindex_ma200
     is_cheap := valuation_distance < valuation_discount
-
 
 // O) DIVERGENCE DETECTION
 
@@ -780,10 +799,7 @@ f_find_high(float src, int len) =>
 float price_low_current = vnindex_m
 float price_low_prev = f_find_low(vnindex_m[1], divergence_lookback)
 bool price_lower_low = price_low_current < price_low_prev
-
-
 // P) MARKET & SECTOR INDICES DATA
-
 float vn30_d = f_sec(sym_vn30, "D", close)
 float vn100_d = na
 float vnmidcap_d = na
@@ -835,93 +851,65 @@ var int current_bucket_duration = 0
 var float[] bucket_durations = array.new_float(5, 0.0)
 var int[] bucket_visit_count = array.new_int(5, 0)
 
+f_check_threshold(float value, int z_len, float clip, int pctl_lookback, float threshold_static, float threshold_z, float threshold_pctl, bool is_high_bad) =>
+    bool result = false
+    if threshold_mode == "Dynamic (z-score)"
+        result := is_high_bad ? f_z(value, z_len, clip) > threshold_z : f_z(value, z_len, clip) < -threshold_z
+    else if threshold_mode == "Percentile-based"
+        result := is_high_bad ? f_check_percentile_warning(value, pctl_lookback, threshold_pctl, false) :   f_check_percentile_warning(value, pctl_lookback, 100-threshold_pctl, true)
+    else
+        result := is_high_bad ? value > threshold_static : value < threshold_static
+    result
 
 // P) RISK SCORE + PARTS
 float infl_gap_idx = f_z(pi_gap_m, infl_z_len_m, infl_clip)
 float mom_idx      = f_z(dpi_m,    infl_z_len_m, infl_clip)
 float sur_idx      = f_z(surprise_m, infl_z_len_m, infl_clip)
 
-bool stress_high = false
-if threshold_mode == "Dynamic (z-score)"
-    stress_high := f_z(tight_idx, rate_z_len_m, clip_multiplier) > 1.0
-else if threshold_mode == "Percentile-based"
-    stress_high := f_check_percentile_warning(tight_idx, percentile_lookback, 85, false)
-else
-    stress_high := tight_idx > 1.5
+bool stress_high = f_check_threshold(tight_idx, rate_z_len_m, clip_multiplier, percentile_lookback, 1.5, 1.0, 85, true)
 
 if useDXY and dxy_stress > 0
     stress_high := true
 
-bool curve_inversion = false
-if useYieldCurve
-    if threshold_mode == "Dynamic (z-score)"
-        curve_inversion := f_z(yc_slope_m, 60, clip_multiplier) < -1.0
-    else if threshold_mode == "Percentile-based"
-        curve_inversion := yc_slope_m <= f_percentile_threshold(yc_slope_m, percentile_lookback, 15)
-    else
-        curve_inversion := yc_slope_m < 0
+bool curve_inversion = useYieldCurve ? f_check_threshold(yc_slope_m, 60, clip_multiplier, percentile_lookback, 0, 1.0, 15, false) : false
 
 // Calculate z-scores for macro variables
 float gdp_z = f_z(gdp_gap_q, gdp_z_len_q, clip_multiplier)
 float infl_z = f_z(pi_m, infl_z_len_m, clip_multiplier)
 
-bool inflation_high = false
-if threshold_mode == "Dynamic (z-score)"
-    inflation_high := infl_z > 1.0
-else if threshold_mode == "Percentile-based"
-    inflation_high := f_check_percentile_warning(pi_m, percentile_lookback, 85, false)
-else
-    inflation_high := pi_m > pi_target + 1.0
+bool inflation_high = f_check_threshold(pi_m, infl_z_len_m, clip_multiplier, percentile_lookback, pi_target + 1.0, 1.0, 85, true)
 
 
-bool growth_low = false
-if threshold_mode == "Dynamic (z-score)"
-    growth_low := f_z(gdp_gap_q, gdp_z_len_q, clip_multiplier) < -1.0
-else if threshold_mode == "Percentile-based"
-    growth_low := f_check_percentile_warning(gdp_gap_q, percentile_lookback, 15, true)
-else
-    growth_low := gdp_gap_q < 0
-
-bool drivers_high = false
-
+bool growth_low = f_check_threshold(gdp_gap_q, gdp_z_len_q, clip_multiplier, percentile_lookback, 0, 1.0, 15, false)
 
 // Credit warning
-bool credit_high = false
-if useCredit
-    if threshold_mode == "Dynamic (z-score)"
-        credit_high := f_z(credit_idx, credit_z_len_m, clip_multiplier) > 1.0
-    else if threshold_mode == "Percentile-based"
-        credit_high := f_check_percentile_warning(credit_idx, percentile_lookback, 85, false)
-    else
-        credit_high := credit_idx > 1.0
+bool credit_high = useCredit ? f_check_threshold(credit_idx, credit_z_len_m, clip_multiplier, percentile_lookback, 1.0, 1.0, 85, true) : false
 bool external_stress = false
 
+bool intl_warning = useYieldCurve ? f_check_threshold(intl_yield_diff, 60, clip_multiplier, percentile_lookback, 0.5, 1.0, 15, false) : false
+bool spread_warning = useYieldCurve ? f_check_threshold(long_short_spread, 60, clip_multiplier, percentile_lookback, 0.5, 1.0, 15, false) : false
 
-bool intl_warning = false
-bool spread_warning = false
-if useYieldCurve
-    if threshold_mode == "Dynamic (z-score)"
-        intl_warning := f_z(intl_yield_diff, 60, clip_multiplier) < -1.0
-        spread_warning := f_z(long_short_spread, 60, clip_multiplier) < -1.0
-    else if threshold_mode == "Percentile-based"
-        intl_warning := f_check_percentile_warning(intl_yield_diff, percentile_lookback, 15, true)
-        spread_warning := f_check_percentile_warning(long_short_spread, percentile_lookback, 15, true)
-    else
-        intl_warning := intl_yield_diff < 0.5
-        spread_warning := long_short_spread < 0.5
-
-// RECALIBRATED LAYERS
+// RISK SCORE
 float layer1_score = stress_high ? w_stress : 0.0
 layer1_score += useDXY and dxy_stress > 0 ? w_dxy : 0.0
 
 float layer2_score = (curve_inversion ? w_curve : 0.0) + (growth_low ? w_growth : 0.0) + (spread_warning ? w_spread : 0.0)
 
-float layer3_score = (intl_warning ? w_intl : 0.0) + (inflation_high ? w_inflation : 0.0) + (drivers_high ? w_drv : 0.0) + (external_stress ? 1.0 : 0.0)
+float layer3_score = (intl_warning ? w_intl : 0.0) + (inflation_high ? w_inflation : 0.0) + (external_stress ? 1.0 : 0.0)
 layer3_score += useCredit and credit_high ? w_credit : 0.0
 
-float risk_score = layer1_score + layer2_score + layer3_score
-float max_score = w_stress + w_curve + w_growth + w_spread + w_intl + w_inflation + w_drv + w_credit + w_dxy + 1.0
-float risk_pct = max_score > 0 ? (risk_score / max_score) * 100.0 : 0.0
+float risk_score_raw = layer1_score + layer2_score + layer3_score
+float max_score = w_stress + w_curve + w_growth + w_spread + w_intl + w_inflation + w_credit + w_dxy + 1.0
+float risk_pct_base = max_score > 0 ? (risk_score_raw / max_score) * 100.0 : 0.0
+
+// VN market adjustment: Higher sensitivity to funding stress & FX volatility
+float vn_market_multiplier = 1.0
+if stress_high and not na(fx_yoy_abs) and fx_yoy_abs > 2.0
+    vn_market_multiplier := 1.15
+else if useCredit and credit_high and inflation_high
+    vn_market_multiplier := 1.10
+
+float risk_pct = math.min(100.0, risk_pct_base * vn_market_multiplier)
 
 // VALUATION ADJUSTMENT
 if useValuation and is_cheap and risk_pct > 60
@@ -965,11 +953,9 @@ bool risk_lower_high = risk_high_current < risk_high_prev
 
 bool bullish_divergence = price_lower_low and risk_lower_high and risk_pct < 70
 
-// Risk component scores (binary: 0 or 1)
-float S_infl = inflation_high ? 1.0 : 0.0
-float S_pol  = stress_high     ? 1.0 : 0.0
-float S_grow = growth_low      ? 1.0 : 0.0
-float S_drv  = drivers_high    ? 1.0 : 0.0
+float S_infl = infl_gap_idx + 0.5 * mom_idx + 0.5 * sur_idx  // Inflation composite
+float S_pol  = tight_idx + 0.5 * f_z(policy_gap, policy_z_len_m, 2.5)  // Policy composite
+float S_grow = -grow_idx  // Negative growth index (slow growth = higher risk)
 
 
 var float[] vnindex_hist = array.new_float(0)
@@ -1244,8 +1230,8 @@ bool fed_gap_stress = not na(fed_gap) and fed_gap > 2.0
 bool policy_press_high = not na(policy_pressure) and policy_pressure >= zone_high_pct
 
 bool scenario_liquidity_crisis = stress_high and curve_inversion and (intl_warning or fx_stress_high)
-bool scenario_growth_slowdown = growth_low and drivers_high and spread_warning
-bool scenario_inflation_surge = inflation_high and external_stress and drivers_high
+bool scenario_growth_slowdown = growth_low and spread_warning
+bool scenario_inflation_surge = inflation_high and external_stress
 bool scenario_stagflation = inflation_high and growth_low and stress_high
 bool scenario_soft_landing = macro_improving and not inflation_high and not stress_high
 bool scenario_bull_market = bullish_divergence and is_cheap and macro_improving
@@ -1339,6 +1325,12 @@ var float[] arr_layer2       = array.new_float()
 var float[] arr_layer3       = array.new_float()
 var float[] arr_intl_diff    = array.new_float()
 var float[] arr_long_short   = array.new_float()
+
+// Evaluation arrays
+var float[] arr_mae    = array.new_float()
+var float[] arr_rmse   = array.new_float()
+var float[] arr_churn  = array.new_float()
+var float[] arr_err_abs = array.new_float()
 f_arr_push_float(float[] arr, float val, int maxlen) =>
     if not na(val)
         array.push(arr, val)
@@ -1365,13 +1357,17 @@ if isNewMonth
     f_arr_push_float(arr_sinfl, S_infl, 500)
     f_arr_push_float(arr_spol, S_pol, 500)
     f_arr_push_float(arr_sgrow, S_grow, 500)
-    f_arr_push_float(arr_sdrv, S_drv, 500)
     f_arr_push_float(arr_risk_forecast, risk_forecast, 500)
     f_arr_push_float(arr_layer1, layer1_score, 500)
     f_arr_push_float(arr_layer2, layer2_score, 500)
     f_arr_push_float(arr_layer3, layer3_score, 500)
     f_arr_push_float(arr_intl_diff, intl_yield_diff, 500)
     f_arr_push_float(arr_long_short, long_short_spread, 500)
+    // Evaluation metrics tracking
+    f_arr_push_float(arr_mae, mae24_m, 500)
+    f_arr_push_float(arr_rmse, rmse24_m, 500)
+    f_arr_push_float(arr_churn, churn12, 500)
+    f_arr_push_float(arr_err_abs, math.abs(surprise_m), 500)
     if useCredit
         f_arr_push_float(arr_m2, m2_yoy_m, 500)
         f_arr_push_float(arr_m2gap, m2_gap_m, 500)
@@ -1410,7 +1406,6 @@ float p_ycidx   = useYieldCurve ? f_arr_pctl(arr_ycidx, yc_idx) : na
 float p_sinfl   = f_arr_pctl(arr_sinfl, S_infl)
 float p_spol    = f_arr_pctl(arr_spol, S_pol)
 float p_sgrow   = f_arr_pctl(arr_sgrow, S_grow)
-float p_sdrv    = f_arr_pctl(arr_sdrv, S_drv)
 float p_risk    = f_arr_pctl(arr_risk_pct, risk_pct)
 float p_risk_forecast = f_arr_pctl(arr_risk_forecast, risk_forecast)
 float p_layer1  = f_arr_pctl(arr_layer1, layer1_score)
@@ -1423,6 +1418,12 @@ float p_m2gap = useCredit ? f_arr_pctl(arr_m2gap, m2_gap_m) : na
 float p_credit = useCredit ? f_arr_pctl(arr_credit_idx, credit_idx) : na
 float p_dxy = useDXY ? f_arr_pctl(arr_dxy, dxy_m) : na
 float p_valuation = useValuation ? f_arr_pctl(arr_valuation, valuation_distance) : na
+
+// Evaluation percentiles
+float p_mae = f_arr_pctl(arr_mae, mae24_m)
+float p_rmse = f_arr_pctl(arr_rmse, rmse24_m)
+float p_churn = f_arr_pctl(arr_churn, churn12)
+float p_err_abs = f_arr_pctl(arr_err_abs, math.abs(surprise_m))
 
 string infl_state = not hasDataP1 ? "No data" : (cond_cool ? "Đang hạ nhiệt" : (cond_hot ? "Có dấu hiệu nóng lại" : "Di ngang"))
 
@@ -1444,7 +1445,7 @@ string eval_vi = ((not na(mae24_m) and mae24_m < 0.20 and not na(churn12) and ch
 
 
 // O) PLOTS
-// P1: Inflation (merged P1+P4)
+// P1: Inflation
 plot(panel==1 ? pi_trend_m : na, "P1 Trend", linewidth=2, color=color.gray)
 plot(panel==1 ? pi_gap_m   : na, "P1 Gap",   style=plot.style_area, color=color.new(color.orange, 80))
 plot(panel==1 ? pi_m       : na, "P1 Inflation",   linewidth=2, trackprice=false, color=color.purple)
@@ -1778,37 +1779,19 @@ f_display_macro_indicators(int offset) =>
 
     row_offset
 
-f_get_risk_color(float pct) =>
-    pct > 70 ? color.red : pct > 40 ? color.orange : color.green
+
 
 // Display risk layers
 f_display_risk_layers(int offset) =>
     int row_offset = offset
     f_hdr(row_offset, "CÁC LỚP RỦI RO")
     row_offset += 1
-    float l1_pct = layer1_score / 3.5 * 100.0
-    l1_color = f_get_risk_color(l1_pct)
 
-    f_cell(row_offset, 0, "L1: Funding", color.new(color.blue,80), color.black, text.align_left)
-    f_cell(row_offset, 1, f_fmt(layer1_score,1), l1_color, color.black, text.align_center)
-    f_cell(row_offset, 2, "/3.5", color.new(color.gray,80), color.silver, text.align_left)
-    f_cell(row_offset, 3, str.tostring(l1_pct), l1_color, color.white, text.align_left)
+    f_layer_display(row_offset, "L1: Funding", layer1_score, 3.5)
     row_offset += 1
-
-    float l2_pct = layer2_score / 6.5 * 100.0
-    l2_color = f_get_risk_color(l2_pct)
-    f_cell(row_offset, 0, "L2: Cycle", color.new(color.blue,80), color.black, text.align_left)
-    f_cell(row_offset, 1, f_fmt(layer2_score,1), l2_color, color.black, text.align_center)
-    f_cell(row_offset, 2, "/6.5", color.new(color.gray,80), color.silver, text.align_left)
-    f_cell(row_offset, 3, str.tostring(l2_pct), l2_color, color.white, text.align_left)
+    f_layer_display(row_offset, "L2: Cycle", layer2_score, 6.5)
     row_offset += 1
-
-    float l3_pct = layer3_score / 7.0 * 100.0
-    l3_color = f_get_risk_color(l3_pct)
-    f_cell(row_offset, 0, "L3: External", color.new(color.blue,80), color.black, text.align_left)
-    f_cell(row_offset, 1, f_fmt(layer3_score,1), l3_color, color.black, text.align_center)
-    f_cell(row_offset, 2, "/7.0", color.new(color.gray,80), color.silver, text.align_left)
-    f_cell(row_offset, 3, str.tostring(l3_pct), l3_color, color.white, text.align_left)
+    f_layer_display(row_offset, "L3: External", layer3_score, 7.0)
     row_offset += 1
     row_offset
 
@@ -1859,7 +1842,7 @@ f_display_transition_matrix(int offset) =>
             row_offset += 1
 
         row_offset += 1
-        f_cell(row_offset, 0, "📝 Note:", color.new(color.blue,85), color.black, text.align_left)
+        f_cell(row_offset, 0, "Note:", color.new(color.blue,85), color.black, text.align_left)
         f_cell(row_offset, 1, "Showing B0→B2 (Table limit 4 cols)", color.new(color.black,10), color.silver, text.align_left)
         table.merge_cells(t, 1, row_offset, 3, row_offset)
         row_offset += 1
@@ -1918,7 +1901,7 @@ f_display_transition_matrix(int offset) =>
 
     // Interpretation (common for both matrix types)
     row_offset += 1
-    f_cell(row_offset, 0, "💡 Giải thích:", color.new(color.purple,75), color.black, text.align_left)
+    f_cell(row_offset, 0, "Giải thích:", color.new(color.purple,75), color.black, text.align_left)
 
     // Calculate stability (diagonal sum / total)
     int diagonal_sum = array.get(transition_matrix, 0) + array.get(transition_matrix, 6) + array.get(transition_matrix, 12) + array.get(transition_matrix, 18) + array.get(transition_matrix, 24)
@@ -1993,7 +1976,7 @@ f_display_transition_matrix(int offset) =>
         f_hdr(row_offset, "TRANSITION PROBABILITIES")
         row_offset += 1
 
-        f_cell(row_offset, 0, "💡 Insight:", color.new(color.purple,75), color.white, text.align_left)
+        f_cell(row_offset, 0, "Insight:", color.new(color.purple,75), color.white, text.align_left)
 
         // Calculate key transition probabilities
         // B0 -> B1 (improvement from low risk)
@@ -2029,16 +2012,10 @@ f_display_transition_matrix(int offset) =>
 
 
 
-// Display panel-specific details (refactored from giant if statement)
 f_display_panel_specific(int offset) =>
     int row_offset = offset
-
-
-    // PANEL-SPECIFIC DETAILS
-
     f_hdr(row_offset, "CHI TIẾT: " + panelOption)
     row_offset += 1
-
     // Column headers with better styling
     f_cell(row_offset, 0, "Chỉ tiêu", color.new(color.navy,50), color.white, text.align_left)
     f_cell(row_offset, 1, "Giá trị", color.new(color.navy,50), color.white, text.align_center)
@@ -2069,9 +2046,22 @@ f_display_panel1(int offset) =>
     f_cell(row_offset, 1, infl_state, state_color, color.white, text.align_left)
     table.merge_cells(t, 1, row_offset, 3, row_offset)
     row_offset += 1
-    f_cell(row_offset, 0, "Độ chính xác dự báo:", color.new(color.blue,20), color.white, text.align_left)
-    string infl_eval = "MAE24=" + (na(mae24_m) ? "-" : f_fmt(mae24_m,2)) + " | RMSE=" + (na(rmse24_m) ? "-" : f_fmt(rmse24_m,2))
-    f_cell(row_offset, 1, infl_eval, color.new(color.black,10), color.white, text.align_left)
+
+    // EVALUATION SECTION - Enhanced với percentiles
+    row_offset += 1
+    f_hdr(row_offset, "ĐỘ CHÍNH XÁC DỰ BÁO")
+    row_offset += 1
+
+    f_row(row_offset, "MAE (24T)", na(mae24_m) ? "-" : f_fmt(mae24_m,3), f_pctl_text(p_mae,true), p_mae, true, "Sai số tuyệt đối TB")
+    f_row(row_offset+1, "RMSE (24T)", na(rmse24_m) ? "-" : f_fmt(rmse24_m,3), f_pctl_text(p_rmse,true), p_rmse, true, "Root MSE")
+    f_row(row_offset+2, "Churn (12T)", na(churn12) ? "-" : f_fmt(churn12,1), f_pctl_text(p_churn,true), p_churn, true, "Số lần đổi trạng thái")
+    f_row(row_offset+3, "Sai so hien tai", na(surprise_m) ? "-" : f_fmt(math.abs(surprise_m),2), f_pctl_text(p_err_abs,true), p_err_abs, true, "Abs(Thực tế - Dự báo)")
+    row_offset += 4
+
+    string eval_status = not na(mae24_m) and mae24_m < 0.20 and not na(churn12) and churn12 <= 2 ? "✅ TIN CẬY" : not na(mae24_m) and mae24_m > 0.50 ? "⚠ KÉM" : "🟡 TRUNG BÌNH"
+    color eval_color = not na(mae24_m) and mae24_m < 0.20 and not na(churn12) and churn12 <= 2 ? color.new(color.green,60) : not na(mae24_m) and mae24_m > 0.50 ? color.new(color.red,60) : color.new(color.orange,60)
+    f_cell(row_offset, 0, "Đánh giá:", color.new(color.blue,20), color.white, text.align_left)
+    f_cell(row_offset, 1, eval_status, eval_color, color.white, text.align_left)
     table.merge_cells(t, 1, row_offset, 3, row_offset)
     row_offset + 1
 
@@ -2149,15 +2139,15 @@ f_display_scenario(int offset) =>
     // BUCKET-SPECIFIC GUIDANCE
     string bucket_guidance = ""
     if current_bucket == 0
-        bucket_guidance := "💡 B0: Risk rất thấp → Tăng tỷ trọng equity (60-70%), ưu tiên cyclical & smallcap"
+        bucket_guidance := "B0: Risk rất thấp → Tăng tỷ trọng equity (60-70%), ưu tiên cyclical & smallcap"
     else if current_bucket == 1
-        bucket_guidance := "💡 B1: Risk thấp → Balanced (50-60% equity), midcap có cơ hội"
+        bucket_guidance := "B1: Risk thấp → Balanced (50-60% equity), midcap có cơ hội"
     else if current_bucket == 2
-        bucket_guidance := "💡 B2: Risk trung bình → Cân đối (40-50% equity), quality focus"
+        bucket_guidance := "B2: Risk trung bình → Cân đối (40-50% equity), quality focus"
     else if current_bucket == 3
-        bucket_guidance := "💡 B3: Risk cao → Defensive (25-35% equity), large caps/bonds"
+        bucket_guidance := "B3: Risk cao → Defensive (25-35% equity), large caps/bonds"
     else
-        bucket_guidance := "💡 B4: Risk rất cao → Bảo toàn (15-25% equity), cash/bonds/gold"
+        bucket_guidance := "B4: Risk rất cao → Bảo toàn (15-25% equity), cash/bonds/gold"
 
     f_cell(row_offset, 0, "Guidance:", color.new(color.purple,70), color.black, text.align_left)
     f_cell(row_offset, 1, bucket_guidance, color.new(color.purple,85), color.black, text.align_left)
@@ -2277,6 +2267,7 @@ if barstate.islast
             f_cell(row_offset, 3, y5_move, color.new(color.black,10), y5_chg > 0.1 ? color.red : y5_chg < -0.1 ? color.green : color.silver, text.align_center)
             row_offset += 1
 
+
             // 10Y Row
             float y10_z = use_yc_lab ? f_z(vn10y_d, yc_stats_len, yc_clip_mult) : na
             string y10_state = na(y10_z) ? "-" : y10_z > 1.0 ? "RICH" : y10_z < -1.0 ? "CHEAP" : "FAIR"
@@ -2345,112 +2336,32 @@ if barstate.islast
                 row_offset += 1
 
                 if yc_research_status == "READY"
-                    // Correlation with 3 lags
                     f_cell(row_offset, 0, "Corr (lag)", color.new(color.navy,50), color.white, text.align_left)
-                    f_cell(row_offset, 1, "L" + str.tostring(yc_lag1), color.new(color.navy,50), color.white, text.align_center)
-                    f_cell(row_offset, 2, "L" + str.tostring(yc_lag2), color.new(color.navy,50), color.white, text.align_center)
-                    f_cell(row_offset, 3, "L" + str.tostring(yc_lag3), color.new(color.navy,50), color.white, text.align_center)
+                    f_cell(row_offset, 1, "L" + str.tostring(yc_lag1) + ":" + (na(yc_vnx_corr_lag1) ? "-" : f_fmt(yc_vnx_corr_lag1,3)), color.new(color.navy,50), color.white, text.align_center)
+                    f_cell(row_offset, 2, "L" + str.tostring(yc_lag2) + ":" + (na(yc_vnx_corr_lag2) ? "-" : f_fmt(yc_vnx_corr_lag2,3)), color.new(color.navy,50), color.white, text.align_center)
+                    f_cell(row_offset, 3, "L" + str.tostring(yc_lag3) + ":" + (na(yc_vnx_corr_lag3) ? "-" : f_fmt(yc_vnx_corr_lag3,3)), color.new(color.navy,50), color.white, text.align_center)
                     row_offset += 1
 
-                    // Correlation values with color coding
-                    f_cell(row_offset, 0, "Correlation", color.new(color.blue,85), color.white, text.align_left)
-
-                    // Lag 1
-                    color corr1_bg = na(yc_vnx_corr_lag1) ? color.new(color.gray,85) :
-                                     math.abs(yc_vnx_corr_lag1) > 0.5 ? color.new(color.red,70) :
-                                     math.abs(yc_vnx_corr_lag1) > 0.3 ? color.new(color.orange,75) : color.new(color.gray,85)
-                    string corr1_icon = not na(yc_best_lag) and yc_best_lag == yc_lag1 ? "⭐" : ""
-                    f_cell(row_offset, 1, corr1_icon + (na(yc_vnx_corr_lag1) ? "-" : f_fmt(yc_vnx_corr_lag1,3)), corr1_bg, color.white, text.align_center)
-
-                    // Lag 2
-                    color corr2_bg = na(yc_vnx_corr_lag2) ? color.new(color.gray,85) :
-                                     math.abs(yc_vnx_corr_lag2) > 0.5 ? color.new(color.red,70) :
-                                     math.abs(yc_vnx_corr_lag2) > 0.3 ? color.new(color.orange,75) : color.new(color.gray,85)
-                    string corr2_icon = not na(yc_best_lag) and yc_best_lag == yc_lag2 ? "⭐" : ""
-                    f_cell(row_offset, 2, corr2_icon + (na(yc_vnx_corr_lag2) ? "-" : f_fmt(yc_vnx_corr_lag2,3)), corr2_bg, color.white, text.align_center)
-
-                    // Lag 3
-                    color corr3_bg = na(yc_vnx_corr_lag3) ? color.new(color.gray,85) :
-                                     math.abs(yc_vnx_corr_lag3) > 0.5 ? color.new(color.red,70) :
-                                     math.abs(yc_vnx_corr_lag3) > 0.3 ? color.new(color.orange,75) : color.new(color.gray,85)
-                    string corr3_icon = not na(yc_best_lag) and yc_best_lag == yc_lag3 ? "⭐" : ""
-                    f_cell(row_offset, 3, corr3_icon + (na(yc_vnx_corr_lag3) ? "-" : f_fmt(yc_vnx_corr_lag3,3)), corr3_bg, color.white, text.align_center)
+                    f_cell(row_offset, 0, "Best Lag", color.new(color.blue,85), color.white, text.align_left)
+                    string best_lag_text = na(yc_best_lag) ? "-" : "L" + str.tostring(yc_best_lag)
+                    f_cell(row_offset, 1, best_lag_text, color.new(color.green,70), color.white, text.align_center)
+                    f_cell(row_offset, 2, "Beta", color.new(color.blue,85), color.white, text.align_left)
+                    f_cell(row_offset, 3, na(yc_vnx_beta_best) ? "-" : f_fmt(yc_vnx_beta_best,4), color.new(color.black,10), color.white, text.align_center)
                     row_offset += 1
 
-                    // BestLag & R²
-                    f_cell(row_offset, 0, "BestLag", color.new(color.blue,85), color.white, text.align_left)
-                    f_cell(row_offset, 1, not na(yc_best_lag) ? "L" + str.tostring(yc_best_lag) : "-", color.new(color.black,10), color.yellow, text.align_center)
-                    f_cell(row_offset, 2, "R²", color.new(color.blue,85), color.white, text.align_left)
-                    color r2_color = not na(yc_vnx_r2_best) and yc_vnx_r2_best > 0.25 ? color.new(color.green,70) : color.new(color.gray,85)
-                    f_cell(row_offset, 3, not na(yc_vnx_r2_best) ? f_fmt(yc_vnx_r2_best,3) : "-", r2_color, color.white, text.align_center)
-                    row_offset += 1
-
-                    // Beta & Lag Stability
-                    f_cell(row_offset, 0, "Beta", color.new(color.blue,85), color.white, text.align_left)
-                    f_cell(row_offset, 1, not na(yc_vnx_beta_best) ? f_fmt(yc_vnx_beta_best,4) : "-", color.new(color.black,10), color.white, text.align_center)
-                    f_cell(row_offset, 2, "Lag Stab%", color.new(color.blue,85), color.white, text.align_left)
-                    color stab_color = not na(yc_lag_stability) and yc_lag_stability > 60 ? color.new(color.green,70) : color.new(color.orange,75)
-                    f_cell(row_offset, 3, not na(yc_lag_stability) ? f_fmt(yc_lag_stability,1)+"%" : "-", stab_color, color.white, text.align_center)
-                    row_offset += 1
-
-                    // Interpretation
-                    row_offset += 1
-                    f_cell(row_offset, 0, "💡 Giải thích:", color.new(color.purple,75), color.white, text.align_left)
-                    string research_interp = ""
-                    if not na(yc_vnx_r2_best) and yc_vnx_r2_best < 0.10
-                        research_interp := "Tương quan yếu - Stress ít ảnh hưởng VNINDEX"
-                    else if not na(yc_vnx_corr_lag1) and yc_vnx_corr_lag1 < -0.3
-                        research_interp := "Tương quan âm - Stress cao → VNINDEX giảm"
-                    else if not na(yc_lag_stability) and yc_lag_stability < 50
-                        research_interp := "Lag không ổn định - Quan hệ không đáng tin"
-                    else
-                        research_interp := "BestLag: L" + (na(yc_best_lag) ? "-" : str.tostring(yc_best_lag)) + " | R²=" + (na(yc_vnx_r2_best) ? "-" : f_fmt(yc_vnx_r2_best,2))
-                    f_cell(row_offset, 1, research_interp, color.new(color.black,10), color.white, text.align_left)
-                    table.merge_cells(t, 1, row_offset, 3, row_offset)
-
-                    // REGIME-FILTERED RESEARCH (OKQ - Only OK Quality)
-                    row_offset += 2
-                    f_hdr(row_offset, "📊 REGIME FILTER: OKQ (Quality >= " + f_fmt(yc_quality_threshold,0) + ")")
-                    row_offset += 1
-
-                    // OKQ Status
-                    f_cell(row_offset, 0, "OKQ Status", color.new(color.blue,85), color.white, text.align_left)
-                    color okq_status_color = yc_okq_status == "READY" ? color.new(color.green,70) : color.new(color.orange,70)
-                    string okq_status_text = yc_okq_status + " (N=" + (na(yc_eff_n_okq) ? "-" : str.tostring(int(yc_eff_n_okq))) + ")"
-                    f_cell(row_offset, 1, okq_status_text, okq_status_color, color.white, text.align_center)
-                    table.merge_cells(t, 1, row_offset, 3, row_offset)
+                    f_cell(row_offset, 0, "R²", color.new(color.blue,85), color.white, text.align_left)
+                    f_cell(row_offset, 1, na(yc_vnx_r2_best) ? "-" : f_fmt(yc_vnx_r2_best*100,1)+"%", color.new(color.black,10), color.white, text.align_center)
+                    f_cell(row_offset, 2, "Lag Stab", color.new(color.blue,85), color.white, text.align_left)
+                    color stab_color = not na(yc_lag_stability) and yc_lag_stability >= 60 ? color.new(color.green,70) : not na(yc_lag_stability) and yc_lag_stability < 40 ? color.new(color.red,70) : color.new(color.orange,70)
+                    f_cell(row_offset, 3, na(yc_lag_stability) ? "-" : f_fmt(yc_lag_stability,1)+"%", stab_color, color.white, text.align_center)
                     row_offset += 1
 
                     if yc_okq_status == "READY"
-                        // OKQ Correlation & Beta
-                        f_cell(row_offset, 0, "Corr (OKQ)", color.new(color.blue,85), color.white, text.align_left)
-                        color okq_corr_bg = na(yc_vnx_corr_okq) ? color.new(color.gray,85) :
-                                           math.abs(yc_vnx_corr_okq) > 0.5 ? color.new(color.red,70) :
-                                           math.abs(yc_vnx_corr_okq) > 0.3 ? color.new(color.orange,75) : color.new(color.gray,85)
-                        f_cell(row_offset, 1, na(yc_vnx_corr_okq) ? "-" : f_fmt(yc_vnx_corr_okq,3), okq_corr_bg, color.white, text.align_center)
-                        f_cell(row_offset, 2, "Beta (OKQ)", color.new(color.blue,85), color.white, text.align_left)
-                        f_cell(row_offset, 3, na(yc_vnx_beta_okq) ? "-" : f_fmt(yc_vnx_beta_okq,4), color.new(color.black,10), color.white, text.align_center)
+                        f_cell(row_offset, 0, "OKQ Filter", color.new(color.purple,75), color.white, text.align_left)
+                        f_cell(row_offset, 1, "Corr:" + (na(yc_vnx_corr_okq) ? "-" : f_fmt(yc_vnx_corr_okq,3)), color.new(color.black,10), color.white, text.align_center)
+                        f_cell(row_offset, 2, "Beta:" + (na(yc_vnx_beta_okq) ? "-" : f_fmt(yc_vnx_beta_okq,4)), color.new(color.black,10), color.white, text.align_center)
+                        f_cell(row_offset, 3, "N=" + (na(yc_eff_n_okq) ? "-" : str.tostring(int(yc_eff_n_okq))), color.new(color.black,10), color.white, text.align_center)
                         row_offset += 1
-
-                        // Comparison with ALL
-                        row_offset += 1
-                        f_cell(row_offset, 0, "📈 So sánh:", color.new(color.purple,75), color.white, text.align_left)
-                        string okq_compare = ""
-                        if not na(yc_vnx_corr_okq) and not na(yc_vnx_corr_lag1)
-                            float corr_diff = math.abs(yc_vnx_corr_okq) - math.abs(yc_vnx_corr_lag1)
-                            if math.abs(corr_diff) < 0.05
-                                okq_compare := "Tương quan ổn định (ALL ≈ OKQ)"
-                            else if corr_diff > 0.1
-                                okq_compare := "LOWQ làm YẾU tương quan → Tin OKQ hơn"
-                            else
-                                okq_compare := "LOWQ làm MẠNH tương quan → Nghi ngờ overfit"
-                        else
-                            okq_compare := "Chưa đủ dữ liệu để so sánh"
-                        f_cell(row_offset, 1, okq_compare, color.new(color.black,10), color.aqua, text.align_left)
-                        table.merge_cells(t, 1, row_offset, 3, row_offset)
-                    else
-                        f_cell(row_offset, 0, "⚠ Không đủ sample OKQ", color.new(color.orange,70), color.white, text.align_left)
-                        table.merge_cells(t, 0, row_offset, 3, row_offset)
                 else
                     // Not enough data
                     f_cell(row_offset, 0, "⚠ Cần thêm dữ liệu", color.new(color.orange,70), color.white, text.align_left)
@@ -2555,7 +2466,7 @@ if barstate.islast
 
             // Additional metrics row header
             row_offset += 1
-            f_cell(row_offset, 0, "📊 EXTENDED METRICS", color.new(color.purple,60), color.white, text.align_center)
+            f_cell(row_offset, 0, "EXTENDED METRICS", color.new(color.purple,60), color.white, text.align_center)
             table.merge_cells(t, 0, row_offset, 3, row_offset)
             row_offset += 1
             f_cell(row_offset, 0, "Index", color.new(color.navy,50), color.white, text.align_left)
@@ -2789,11 +2700,11 @@ if barstate.islast
             row_offset += 1
             string sector_insight = ""
             if current_bucket <= 1
-                sector_insight := "💡 B0-B1: Ưu tiên cyclical (VNFIN, VNIND), midcap/smallcap"
+                sector_insight := "B0-B1: Ưu tiên cyclical (VNFIN, VNIND), midcap/smallcap"
             else if current_bucket == 2
-                sector_insight := "💡 B2: Cân bằng cyclical & defensive, quan sát top sectors"
+                sector_insight := "B2: Cân bằng cyclical & defensive, quan sát top sectors"
             else if current_bucket >= 3
-                sector_insight := "💡 B3-B4: Ưu tiên defensive, tránh cyclical rủi ro cao"
+                sector_insight := "B3-B4: Ưu tiên defensive, tránh cyclical rủi ro cao"
 
             f_cell(row_offset, 0, "Sector Tip:", color.new(color.purple,80), color.white, text.align_left)
             f_cell(row_offset, 1, sector_insight, color.new(color.purple,80), color.white, text.align_left)
@@ -2802,7 +2713,7 @@ if barstate.islast
 
             // INTERPRETATION GUIDE
             row_offset += 1
-            f_cell(row_offset, 0, "📖 Bucket hiện tại:", color.new(color.purple,75), color.white, text.align_left)
+            f_cell(row_offset, 0, "Bucket hiện tại:", color.new(color.purple,75), color.white, text.align_left)
             f_cell(row_offset, 1, f_bucket_label(current_bucket), f_bucket_bg(current_bucket), color.white, text.align_center)
             table.merge_cells(t, 1, row_offset, 3, row_offset)
             row_offset += 1
@@ -2816,11 +2727,11 @@ if barstate.islast
             else if current_bucket == 2
                 bucket_strategy := "🟡 B2: Cân bằng, theo dõi chuyển bucket"
             else if current_bucket == 3
-                bucket_strategy := "⚠ B3: Giảm dần equity, tăng defensive"
+                bucket_strategy := "B3: Giảm dần equity, tăng defensive"
             else
                 bucket_strategy := "🔴 B4: Phòng thủ tối đa, cash/gold/bonds"
 
-            f_cell(row_offset, 0, "💡 Chiến lược:", color.new(color.blue,75), color.white, text.align_left)
+            f_cell(row_offset, 0, "Chiến lược:", color.new(color.blue,75), color.white, text.align_left)
             f_cell(row_offset, 1, bucket_strategy, color.new(color.black,10), color.white, text.align_left)
             table.merge_cells(t, 1, row_offset, 3, row_offset)
             row_offset += 1
@@ -2897,6 +2808,34 @@ if barstate.islast
 
         f_cell(row_offset, 0, "VN Impact:", color.new(color.purple,75), color.white, text.align_left)
         f_cell(row_offset, 1, vn_impact, color.new(color.black,10), color.white, text.align_left)
+        table.merge_cells(t, 1, row_offset, 3, row_offset)
+        row_offset += 1
+
+        // US YC COMPARISON SECTION
+        row_offset += 1
+        f_cell(row_offset, 0, "US YC COMPARISON", color.new(color.navy,40), color.white, text.align_center)
+        table.merge_cells(t, 0, row_offset, 3, row_offset)
+        row_offset += 1
+
+        f_cell(row_offset, 0, "US Slope", color.new(color.blue,85), color.white, text.align_left)
+        color us_slope_color = us_yc_slope < -0.2 ? color.new(color.red,60) : us_yc_slope > 1.0 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 1, not na(us_yc_slope) ? f_fmt(us_yc_slope,2)+"bp" : "NA", us_slope_color, color.white, text.align_center)
+        f_cell(row_offset, 2, "VN Slope", color.new(color.blue,85), color.white, text.align_left)
+        color vn_slope_color = yc_slope < 0 ? color.new(color.red,60) : yc_slope > 1.0 ? color.new(color.green,60) : color.new(color.black,10)
+        f_cell(row_offset, 3, not na(yc_slope) ? f_fmt(yc_slope,2)+"bp" : "NA", vn_slope_color, color.white, text.align_center)
+        row_offset += 1
+
+        f_cell(row_offset, 0, "VN-US Diff", color.new(color.blue,85), color.white, text.align_left)
+        color spread_color = not na(vn_us_spread) and vn_us_spread > 3.0 ? color.new(color.green,60) : not na(vn_us_spread) and vn_us_spread < 1.0 ? color.new(color.red,60) : color.new(color.black,10)
+        string spread_text = not na(vn_us_spread) ? f_fmt(vn_us_spread,2)+"bp" : "NA"
+        f_cell(row_offset, 1, spread_text, spread_color, color.white, text.align_center)
+        f_cell(row_offset, 2, "Fed Gap", color.new(color.blue,85), color.white, text.align_left)
+        f_cell(row_offset, 3, not na(fed_gap) ? f_fmt(fed_gap,2)+"%" : "NA", color.new(color.black,10), color.white, text.align_center)
+        row_offset += 1
+
+        f_cell(row_offset, 0, "Impact", color.new(color.purple,75), color.white, text.align_left)
+        string vn_us_impact = f_vn_impact_from_us(vn_us_spread, fed_gap)
+        f_cell(row_offset, 1, vn_us_impact, color.new(color.black,10), color.white, text.align_left)
         table.merge_cells(t, 1, row_offset, 3, row_offset)
         row_offset += 1
 

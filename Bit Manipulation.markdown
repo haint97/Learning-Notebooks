@@ -85,6 +85,8 @@ Shifts bits left by \(n\) positions, filling right with 0s. Equivalent to multip
 ### AND (`&`)
 Sets a bit to 1 only if both corresponding bits are 1.
 
+Use case: Check if a specific bit is set, clear bits, extract bits.
+
 - **Uses**:
   1. **Masking**: Extract specific bits.
      ```csharp
@@ -116,6 +118,8 @@ Sets a bit to 1 only if both corresponding bits are 1.
 ### OR (`|`)
 Sets a bit to 1 if at least one corresponding bit is 1.
 
+Use case: Set specific bits to 1.
+
 - **Uses**:
   1. **Set Bits**: Turn on specific bits.
      ```csharp
@@ -139,6 +143,9 @@ Sets a bit to 1 if at least one corresponding bit is 1.
 
 ### XOR (`^`)
 Sets a bit to 1 if the bits differ, 0 if they’re the same.
+
+Use case: Toggle bits, find unique elements, swap values.
+
 
 - **Uses**:
   1. **Toggle Bits**: Flip specific bits.
