@@ -4357,286 +4357,791 @@ Total Pressure: 45/100  🟢 MODERATE
 ```
 ## **PHẦN 10: PANEL 9 - MARKET & SECTOR (Thị Trường & Ngành)**
 
-### **10.1. Cấu Trúc Panel**
+### **10.1. Giới Thiệu**
 
+Panel 9 cung cấp phân tích **hiệu suất thị trường theo từng Bucket rủi ro** và **Sector Rotation Analysis** - giúp bạn biết ngành nào outperform/underperform trong từng giai đoạn rủi ro.
+
+**Cấu Trúc Panel:**
 ```
 ─────────────────────────────────────────────────────────
-│ PANEL 9: Market & Sector Analysis                     │
+│ 🏛 MARKET PERFORMANCE - Bucket B1 (20-40%)           │
 │                                                         │
-│ REGIME RETURNS (% by Bucket):                          │
-│ ├─ B0 (Risk 0-20%):   VNI +2.5%  VN30 +2.8%  🟢       │
-│ ├─ B1 (Risk 20-40%):  VNI +1.2%  VN30 +1.5%  🟢       │
-│ ├─ B2 (Risk 40-60%):  VNI -0.3%  VN30 +0.2%  🟡       │
-│ ├─ B3 (Risk 60-80%):  VNI -1.8%  VN30 -1.5%  🔴       │
-│ └─ B4 (Risk 80-100%): VNI -3.2%  VN30 -2.9%  🔴       │
+│ Bối cảnh: 🟢 RỦI RO THẤP - Vẫn tích cực              │
+│ Horizon: 20 bars forward                               │
 │                                                         │
-│ SECTOR ROTATION (Current Bucket):                      │
-│ TOP 3 PERFORMERS:      BOTTOM 3 PERFORMERS:            │
-│ 1. Technology +3.8%    1. Real Estate -2.5%            │
-│ 2. Banking    +2.1%    2. Construction -1.8%           │
-│ 3. Consumer   +1.9%    3. Steel        -1.2%           │
+│ Index      AvgR%    Win%    N                          │
+│ ├─ 🟢 VNINDEX   +2.5%    ⭐65%    45                  │
+│ ├─ 🟢 VN30      +2.8%    ⭐68%    45                  │
+│ ├─ 🟢 VN100     +2.3%    ✓62%     45                  │
+│ ├─ 🟡 MIDCAP    +1.2%    ✓58%     42                  │
+│ └─ 🟢 SMALLCAP  +3.5%    ⭐70%    40                  │
+│                                                         │
+│ EXTENDED METRICS:                                       │
+│ Index      R20%     DD20%   R60%                        │
+│ ├─ VNINDEX  +5.2%   -2.8%   +18.5%                     │
+│ ├─ VN30     +5.8%   -2.5%   +20.1%                     │
+│                                                         │
+│ 🔄 SECTOR ROTATION (Relative Return vs VNINDEX)       │
+│ RR% = Sector return - VNINDEX return                   │
+│                                                         │
+│ ⭐ TOP 3 OUTPERFORM:                                   │
+│ 🥇 VNFIN    +1.8%   Win:72%   #1                       │
+│ 🥈 VNCONS   +0.9%   Win:65%   #2                       │
+│ 🥉 VNIND    +0.5%   Win:58%   #3                       │
+│                                                         │
+│ ⚠ BOTTOM 3 UNDERPERFORM:                              │
+│ 🔻 VNREAL   -1.2%   Win:42%   #4                       │
+│                                                         │
+│ Sector Tip: B0-B1: Ưu tiên cyclical (VNFIN, VNIND)   │
+│ Chiến lược: ✅ B1: Duy trì equity cao, chọn top       │
+│ Timing: 📈 Risk giảm dần → Cơ hội tích lũy            │
 ─────────────────────────────────────────────────────────
 ```
 
-**2 Phần Chính:**
-1. **Regime Returns**: Hiệu suất VNINDEX/VN30 theo từng Bucket (B0-B4)
-2. **Sector Rotation**: Ngành nào outperform/underperform trong từng giai đoạn rủi ro
+**3 Phần Chính:**
+1. **Market Performance**: Hiệu suất VNINDEX/VN30/VN100/MIDCAP/SMALLCAP theo Bucket
+2. **Extended Metrics**: R20% (20-bar return), DD20% (20-bar drawdown), R60% (60-bar return)
+3. **Sector Rotation**: Relative Return của 4 sector chính (VNFIN/VNREAL/VNCONS/VNIND) vs VNINDEX
 
 ---
 
 ### **10.2. Công Thức Tính Toán**
 
-#### **A. Regime Returns (Hiệu Suất Theo Rủi Ro)**
+#### **A. Market Performance by Bucket**
+
+Script theo dõi hiệu suất của 5 chỉ số chính theo từng bucket rủi ro:
 
 ```pine
-// Tính return của VNINDEX trong mỗi bucket
-if current_bucket == 0  // B0 (Risk 0-20%)
-    b0_returns := (close - close[1]) / close[1] * 100
+// Tracking arrays: 5 markets × 5 buckets = 25 slots
+var float[] sumR_market = array.new_float(25, 0.0)
+var float[] cntR_market = array.new_float(25, 0.0)
+var float[] winR_market = array.new_float(25, 0.0)
 
-// Tương tự cho B1, B2, B3, B4
-// Sau đó tính trung bình return trong từng bucket
+// Khi có bar mới, tính return và cập nhật vào bucket hiện tại
+int idx = market_index * 5 + current_bucket  // Ví dụ: VNINDEX (0) + B1 (1) = slot 1
+if not na(current_return)
+    array.set(sumR_market, idx, array.get(sumR_market, idx) + current_return)
+    array.set(cntR_market, idx, array.get(cntR_market, idx) + 1.0)
+    if current_return > 0
+        array.set(winR_market, idx, array.get(winR_market, idx) + 1.0)
+
+// Tính Average Return và Win Rate
+avg_return = array.get(sumR_market, idx) / array.get(cntR_market, idx) * 100.0
+win_rate = array.get(winR_market, idx) / array.get(cntR_market, idx) * 100.0
 ```
 
-**Cách Đọc:**
+**5 Market Indices:**
+- **VNINDEX**: Toàn bộ thị trường
+- **VN30**: 30 cổ phiếu vốn hóa lớn nhất
+- **VN100**: 100 cổ phiếu lớn nhất
+- **MIDCAP**: Cổ phiếu vốn hóa trung bình
+- **SMALLCAP**: Cổ phiếu vốn hóa nhỏ
+
+**Ý Nghĩa:**
 ```
-Bucket   Risk        Expected Return       Ý Nghĩa
+Bucket   Risk        Expected Behavior
 ─────────────────────────────────────────────────────────
-B0       0-20%       +2.5% TB/tháng        🟢 Bull Market
-B1       20-40%      +1.2% TB/tháng        🟢 Growth Phase
-B2       40-60%      -0.3% TB/tháng        🟡 Transitional
-B3       60-80%      -1.8% TB/tháng        🔴 Risk-Off
-B4       80-100%     -3.2% TB/tháng        🔴 Crisis
-```
-
-**Ứng Dụng Thực Tế:**
-```
-Hiện tại đang ở Bucket B1 (Risk 30%)?
-→ Kỳ vọng return: +1.2%/tháng = +14.4%/năm
-→ Tỷ trọng cổ phiếu nên ở 60-70%
-
-Transition Matrix cho thấy 70% khả năng ở lại B1 tháng sau?
-→ Giữ nguyên chiến lược
+B0       0-20%       SMALLCAP > VN30 > VNINDEX (Risk-on)
+B1       20-40%      VN30 ≈ VNINDEX > MIDCAP (Growth)
+B2       40-60%      VN30 > SMALLCAP (Flight to quality)
+B3       60-80%      VN30 > VN100 > MIDCAP > SMALLCAP (Risk-off)
+B4       80-100%     Tất cả giảm, VN30 giảm ít nhất (Crisis)
 ```
 
 ---
 
-#### **B. Sector Rotation (Luân Chuyển Ngành)**
+#### **B. Extended Metrics (R20, DD20, R60)**
 
 ```pine
-// Script tính return của các nhóm ngành
-finance_idx = request.security("VN30", timeframe.period, close)
-tech_idx = request.security("VNIT", timeframe.period, close)
-real_estate_idx = request.security("VNREAL", timeframe.period, close)
+// R20: 20-bar forward return
+float sum_r20 = array.get(sumR20_market, idx)
+float cnt_r20 = array.get(cntR20_market, idx)
+float avg_r20 = (sum_r20 / cnt_r20) * 100.0
 
-// So sánh performance
-sector_return = (sector_close / sector_close[20] - 1) * 100  // 20 ngày
+// DD20: 20-bar maximum drawdown
+float max_dd20 = array.get(maxDD20_market, idx)
+float avg_dd20 = array.get(sumDD20_market, idx) / array.get(cntDD20_market, idx)
+
+// R60: 60-bar forward return
+float sum_r60 = array.get(sumR60_market, idx)
+float cnt_r60 = array.get(cntR60_market, idx)
+float avg_r60 = (sum_r60 / cnt_r60) * 100.0
 ```
 
-**Các Nhóm Ngành Chính:**
-1. **Banking & Finance** (VCB, BID, CTG, MBB)
-2. **Technology** (FPT, CMG)
-3. **Consumer Goods** (VNM, MSN, MWG)
-4. **Real Estate** (VHM, VIC, NVL)
-5. **Materials & Industry** (HPG, GVR, HSG)
-6. **Energy & Utilities** (POW, GAS)
+**Ứng Dụng:**
+- **R20%**: Return kỳ vọng sau 20 bar (1 tháng giao dịch)
+- **DD20%**: Drawdown tối đa trong 20 bar → Đo độ rủi ro
+- **R60%**: Return kỳ vọng sau 60 bar (3 tháng) → Xu hướng dài hạn
+
+**Ví dụ:**
+```
+VNINDEX ở Bucket B1:
+- AvgR%: +2.5% (per horizon, ~20 bars)
+- R20%: +5.2% (tích lũy 20 bars)
+- DD20%: -2.8% (drawdown lớn nhất)
+- R60%: +18.5% (tích lũy 60 bars)
+
+→ Kỳ vọng: +5.2% trong tháng tới, rủi ro giảm -2.8%, xu hướng +18.5% trong 3 tháng
+```
 
 ---
 
-### **10.3. Bảng Luân Chuyển Ngành Theo Bucket**
+#### **C. Sector Rotation - Relative Return Analysis**
 
-| **Bucket** | **Risk** | **Top Performers**        | **Bottom Performers** | **Chiến Lược**            |
-| ---------- | -------- | ------------------------- | --------------------- | ------------------------- |
-| **B0**     | 0-20%    | 🟢 Tech, Small-cap, Growth | 🔴 Utilities, Gold     | Tấn công: Growth > Value  |
-| **B1**     | 20-40%   | 🟢 Banking, Consumer       | 🔴 Materials, Steel    | Cân bằng: Quality stocks  |
-| **B2**     | 40-60%   | 🟡 Large-cap, Defensive    | 🟡 Mid/Small-cap       | Chuyển sang phòng thủ     |
-| **B3**     | 60-80%   | 🟢 Consumer Staples, VNM   | 🔴 Real Estate, Tech   | Phòng thủ: Defensive only |
-| **B4**     | 80-100%  | 🟢 Gold, USD, Cash         | 🔴 Tất cả cổ phiếu     | Exit: Tiền mặt/Vàng       |
+**4 Sector Chính:**
+1. **VNFIN** (Finance): VCB, BID, CTG, MBB, TCB
+2. **VNREAL** (Real Estate): VHM, VIC, NVL, VRE
+3. **VNCONS** (Consumer): VNM, MSN, MWG, SAB
+4. **VNIND** (Industrial): HPG, HSG, GVR, NT2
+
+**Công Thức Relative Return (RR%):**
+```pine
+// Calculate sector returns
+float ret_vnfin = (vnfin_now / vnfin_past - 1) * 100
+float ret_vnindex = (vnindex_now / vnindex_past - 1) * 100
+
+// Relative Return = Sector Return - Benchmark Return
+float rr_vnfin = ret_vnfin - ret_vnindex
+
+// Update stats by bucket
+int idx = sector_index * 5 + current_bucket  // VNFIN (0) + B1 (1) = slot 1
+f_update_return_stats(sumRR_sector, cntRR_sector, winRR_sector, idx, rr_vnfin)
+```
+
+**Ý Nghĩa RR%:**
+- **RR% > 0**: Sector **outperform** VNINDEX → Nên tăng tỷ trọng
+- **RR% < 0**: Sector **underperform** VNINDEX → Nên giảm tỷ trọng
+- **Win%**: % số lần sector có RR% > 0 → Độ tin cậy
+
+**Ví dụ:**
+```
+Bucket B1 (Risk 20-40%):
+VNFIN: Return +4.5%, VNINDEX: +2.5% → RR% = +2.0% (outperform 2%)
+VNREAL: Return +0.8%, VNINDEX: +2.5% → RR% = -1.7% (underperform 1.7%)
+
+→ VNFIN outperform → Tăng tỷ trọng ngân hàng
+→ VNREAL underperform → Giảm tỷ trọng BĐS
+```
+
+**Sector Ranking Logic:**
+Script tự động xếp hạng 4 sector theo RR% và Win%:
+
+```pine
+// Collect sector data
+for i = 0 to 3  // 4 sectors: VNFIN, VNREAL, VNCONS, VNIND
+    int idx = i * 5 + current_bucket
+    float avg_rr = f_avg(sumRR_sector[idx], cntRR_sector[idx]) * 100.0
+    float win_rate = f_winrate(winRR_sector[idx], cntRR_sector[idx])
+
+// Find TOP 3 OUTPERFORMERS
+// Rank by avg_rr (highest first)
+🥇 Rank #1: Best avg_rr%
+🥈 Rank #2: 2nd best avg_rr%
+🥉 Rank #3: 3rd best avg_rr%
+
+// Find BOTTOM 3 UNDERPERFORMERS
+🔻 Rank #4: Worst avg_rr%
+```
+
+**Visual Indicators:**
+```
+Icons trong Sector Rotation:
+🥇 🥈 🥉 = Top 3 outperformers
+🔻 🔽 ⬇ = Bottom 3 underperformers
+⭐ = Win Rate > 60% (tin cậy cao)
+✓ = Win Rate > 50% (tin cậy trung bình)
+⚠ = Win Rate ≤ 50% (không ổn định)
+```
 
 ---
 
-### **10.4. Case Study: Luân Chuyển Ngành**
+### **10.3. Sector Strategy Matrix - Theo Bucket**
 
-#### **Case 9A: Bull Market - B0 (Q1/2021)**
+| **Bucket** | **Risk** | **Top Performers**        | **Bottom Performers** | **Chiến Lược**                      |
+| ---------- | -------- | ------------------------- | --------------------- | ----------------------------------- |
+| **B0**     | 0-20%    | 🟢 VNIND, VNFIN, Smallcap  | 🔴 Defensive stocks    | ✅ Tấn công: Cyclical + Growth       |
+| **B1**     | 20-40%   | 🟢 VNFIN, VNCONS, VN30     | 🟡 VNREAL (thận trọng) | ✅ Duy trì: Quality Large-cap        |
+| **B2**     | 40-60%   | 🟡 VNCONS, VN30            | 🔴 VNREAL, Smallcap    | 🟡 Cân bằng: Chuyển sang Defensive   |
+| **B3**     | 60-80%   | 🟢 VNCONS (VNM), VN30      | 🔴 VNREAL, VNIND       | 🔴 Phòng thủ: Chỉ Consumer Staples   |
+| **B4**     | 80-100%  | 🟢 Cash, Gold, VN Gov Bond | 🔴 Tất cả cổ phiếu     | 🔴 Exit: Tiền mặt/Vàng/Trái phiếu CP |
+
+**Sector Tips trong Script:**
+```pine
+if current_bucket <= 1:
+    "B0-B1: Ưu tiên cyclical (VNFIN, VNIND), midcap/smallcap"
+else if current_bucket == 2:
+    "B2: Cân bằng cyclical & defensive, quan sát top sectors"
+else if current_bucket >= 3:
+    "B3-B4: Ưu tiên defensive, tránh cyclical rủi ro cao"
 ```
-Bucket: B0
-RiskScore: 15%
-VNINDEX Return: +2.8%/tháng
-
-Sector Performance (30 ngày):
-─────────────────────────────────────
-Technology (FPT):        +8.5%  🟢
-Small-cap (VNIndex):     +7.2%  🟢
-Banking (VCB, BID):      +5.8%  🟢
-Consumer (MSN):          +4.5%  🟢
-Real Estate (VHM):       +3.2%  🟢
-Utilities (POW):         +1.1%  🟡
-Gold (SJC):              -0.5%  🔴
-```
-
-**Phân Tích:**
-- **B0 = Bull Market**: Tất cả cổ phiếu tăng, nhưng growth stocks tăng mạnh nhất
-- **Technology outperform**: FPT +8.5% (dẫn đầu)
-- **Small-cap rally**: Vốn hóa nhỏ tăng mạnh hơn Large-cap
-- **Defensive underperform**: Utilities, Gold không được ưa chuộng
-
-**Chiến Lược:**
-```
-🟢 TẤN CÔNG TỐI ĐA - GROWTH STOCKS:
-1. 80% cổ phiếu, trong đó:
-   - 30% Technology & Innovation: FPT, CMG
-   - 25% Banking (hưởng lợi tăng trưởng): VCB, TCB
-   - 15% Consumer Growth: MSN, MWG
-   - 10% Quality Small-cap: DGW, DBC
-2. 15% trái phiếu doanh nghiệp (cho cân bằng)
-3. 5% tiền mặt cơ động
-4. Có thể dùng margin 20-30%
-5. TRÁNH: Utilities, Gold, Defensive stocks (tăng chậm)
-```
-
-**Kết Quả:**
-- Q1-Q2/2021: Danh mục tăng +25% (FPT +40%, VCB +28%)
-- Outperform VNINDEX (+18%)
 
 ---
 
-#### **Case 9B: Risk-Off - B3 (Q3/2022)**
-```
-Bucket: B3
-RiskScore: 72%
-VNINDEX Return: -1.8%/tháng
+### **10.4. Case Study: Sector Rotation Trong Thực Tế**
 
-Sector Performance (30 ngày):
-─────────────────────────────────────
-Consumer Staples (VNM):  +2.5%  🟢 (duy nhất tăng)
-Banking (VCB):           -0.8%  🟡 (giữ vững)
-Utilities (POW):         -1.2%  🟡
-Materials (HPG):         -3.5%  🔴
-Real Estate (VHM):       -5.8%  🔴
-Technology (FPT):        -4.2%  🔴
-Small-cap:               -7.5%  🔴
+#### **Case 9A: B0/B1 - Bull Market (Q1/2021)**
 ```
+Bucket: B0 → B1
+RiskScore: 15% → 25%
+VNINDEX: +2.8%/tháng
 
-**Phân Tích:**
-- **B3 = Risk-Off**: Thị trường sợ hãi, bán tháo mạnh
-- **VNM (Vinamilk) outperform**: Hàng thiết yếu, cổ tức cao → Nơi trú ẩn duy nhất
-- **Growth stocks collapse**: FPT, Small-cap giảm mạnh nhất
-- **Real Estate crisis**: VHM -5.8% (lo ngại tín dụng BĐS)
+SECTOR ROTATION ANALYSIS:
+─────────────────────────────────────────────────────────
+⭐ TOP 3 OUTPERFORM:
+🥇 VNIND    +3.2%   Win:75%   #1 (HPG, HSG tăng mạnh)
+🥈 VNFIN    +2.5%   Win:72%   #2 (VCB, TCB hưởng lợi thanh khoản)
+🥉 VNCONS   +1.8%   Win:68%   #3 (MSN, MWG phục hồi)
 
-**Chiến Lược:**
-```
-🔴 PHÒNG THỦ TỐI ĐA - DEFENSIVE ONLY:
-1. 30% cổ phiếu phòng thủ:
-   - 20% Consumer Staples: VNM (100%)
-   - 10% Large-cap Banking: VCB (nếu muốn giữ)
-2. 40% trái phiếu chính phủ (an toàn tuyệt đối)
-3. 20% tiền mặt
-4. 10% USD hoặc Gold (phòng vệ)
-5. TUYỆT ĐỐI TRÁNH:
-   - Real Estate (VHM, VIC, NVL)
-   - Small-cap (rủi ro cao)
-   - Growth stocks (FPT, MSN)
-   - Materials (HPG, HSG)
-6. Chờ chuyển sang B2 hoặc B1 mới mua lại
+⚠ BOTTOM 3 UNDERPERFORM:
+🔻 VNREAL   -1.5%   Win:35%   #4 (VHM, VIC chậm phục hồi)
+
+Sector Tip: B0-B1: Ưu tiên cyclical (VNFIN, VNIND), midcap/smallcap
+Chiến lược: ✅ B1: Duy trì equity cao, chọn top performers
+Timing: 📈 Risk giảm dần → Cơ hội tích lũy
+─────────────────────────────────────────────────────────
 ```
 
-**Kết Quả:**
-- Danh mục chỉ giảm -2% (nhờ VNM +2.5% và trái phiếu)
-- VNINDEX giảm -5.4% trong tháng
-- Outperform thị trường +3.4%
+**DATA:**
+- **VNINDEX**: 1,100 → 1,180 điểm (+7.3% trong tháng)
+- **VN30**: 1,150 → 1,240 (+7.8%)
+- **Smallcap Index**: +12.5% (outperform mạnh)
+
+**PHÂN TÍCH:**
+1. **VNIND (#1, +3.2% RR)**:
+   - HPG +15%, HSG +12% (hưởng lợi infrastructure boom)
+   - Win Rate 75% → Rất ổn định
+   - Cyclical outperform trong B0/B1
+
+2. **VNFIN (#2, +2.5% RR)**:
+   - VCB +10%, TCB +11% (thanh khoản dồi dào, NIM tăng)
+   - Win Rate 72% → Tin cậy cao
+
+3. **VNREAL (#4, -1.5% RR)**:
+   - VHM chỉ +5.8% (underperform VNINDEX 1.5%)
+   - Áp lực tín dụng BĐS, chính sách thắt chặt
+
+**KẾT LUẬN:**
+- B0/B1 = Bull market → Cyclical (VNIND, VNFIN) outperform
+- Smallcap rally (+12.5%) → Risk appetite cao
+- VNREAL underperform → Cảnh báo sớm về tín dụng BĐS
+
+**HÀNH ĐỘNG ĐẦU TƯ:**
+```
+Portfolio Allocation (B1, Risk 25%):
+1. 70% Cổ phiếu:
+   - 25% VNIND: HPG (10%), HSG (8%), GVR (7%)
+   - 25% VNFIN: VCB (10%), TCB (8%), MBB (7%)
+   - 15% VNCONS: MSN (8%), MWG (7%)
+   - 5% Smallcap: DGW, DBC (cơ hội cao)
+2. 20% Trái phiếu DN (lãi suất 9-10%)
+3. 10% Tiền mặt
+4. TRÁNH: VNREAL (VHM, VIC, NVL) - underperform
+
+Expected Return:
+- Q1: +12% (outperform VNINDEX +7.3% nhờ sector rotation)
+- Risk: Drawdown < 5% (B1 vẫn ổn định)
+```
+
+**KẾT QUẢ:**
+- Danh mục tăng +13.5% trong Q1/2021
+- HPG +18%, VCB +12%, MSN +10%
+- Outperform VNINDEX +6.2% nhờ tập trung vào Top 3 sectors
 
 ---
 
-#### **Case 9C: Transition Phase - B2 (Q4/2023)**
+#### **Case 9B: B3/B4 - Crisis Mode (Q4/2022)**
 ```
-Bucket: B2
-RiskScore: 48%
-VNINDEX Return: -0.3%/tháng
+Bucket: B3 → B4
+RiskScore: 75% → 85%
+VNINDEX: -3.5%/tháng
 
-Sector Performance (30 ngày):
-─────────────────────────────────────
-Banking (VCB, BID):      +1.8%  🟢
-Consumer (VNM, MSN):     +0.8%  🟢
-Technology (FPT):        -0.5%  🟡
-Materials (HPG):         -1.2%  🔴
-Real Estate (VHM):       -2.5%  🔴
-Small-cap:               -3.2%  🔴
+SECTOR ROTATION ANALYSIS:
+─────────────────────────────────────────────────────────
+⭐ TOP 3 OUTPERFORM (ít giảm nhất):
+🥇 VNCONS   +1.2%   Win:65%   #1 (VNM +3%, defensive play)
+🥈 VNFIN    -0.5%   Win:48%   #2 (VCB -1%, giữ vững)
+🥉 VNIND    -2.8%   Win:35%   #3 (HPG -5%)
+
+⚠ BOTTOM 3 UNDERPERFORM:
+🔻 VNREAL   -8.5%   Win:15%   #4 (VHM -15%, NVL -18%)
+
+Sector Tip: B3-B4: Ưu tiên defensive, tránh cyclical rủi ro cao
+Chiến lược: 🔴 B4: Phòng thủ tối đa, cash/gold/bonds
+Timing: 📉 Risk tăng dần → Chờ điều chỉnh
+─────────────────────────────────────────────────────────
 ```
 
-**Phân Tích:**
-- **B2 = Transitional**: Thị trường đang phân vân, chưa rõ hướng
-- **Large-cap outperform**: Banking, VNM tăng nhẹ
-- **Small-cap underperform**: Rủi ro cao, bị bỏ rơi
-- **Chờ catalyst**: Thị trường cần tín hiệu rõ ràng để chọn hướng
+**DATA:**
+- **VNINDEX**: 1,050 → 950 điểm (-9.5% trong tháng)
+- **VN30**: 1,100 → 1,020 (-7.3%, giữ vững hơn)
+- **VNREAL Index**: 650 → 535 (-17.7%, sụp đổ)
 
-**Chiến Lược:**
+**PHÂN TÍCH:**
+1. **VNCONS (#1, +1.2% RR)**:
+   - VNM +3% (duy nhất tăng) - nơi trú ẩn an toàn
+   - Hàng tiêu dùng thiết yếu, cổ tức 8%/năm
+   - Win Rate 65% → Defensive play hiệu quả
+
+2. **VNFIN (#2, -0.5% RR)**:
+   - VCB -1% (giảm ít hơn thị trường 8.5%)
+   - Large-cap banking vẫn giữ vững thanh khoản
+   - Win Rate 48% → Không ổn định như VNM
+
+3. **VNREAL (#4, -8.5% RR)**:
+   - VHM -15%, NVL -18% (khủng hoảng trái phiếu BĐS)
+   - Win Rate 15% → Hoàn toàn underperform
+   - Rủi ro vỡ nợ, thanh khoản kém
+
+**KẾT LUẬN:**
+- B3/B4 = Crisis → Chỉ VNCONS (VNM) là nơi trú ẩn duy nhất
+- VNREAL collapse (-17.7%) → Xác nhận khủng hoảng BĐS
+- VN30 giữ vững hơn VNINDEX (-7.3% vs -9.5%) → Flight to quality
+
+**HÀNH ĐỘNG ĐẦU TƯ:**
 ```
-🟡 CÂN BẰNG - QUALITY LARGE-CAP:
-1. 55% cổ phiếu, tập trung Large-cap:
-   - 25% Banking: VCB, BID, CTG (ổn định, cổ tức)
-   - 20% Consumer Staples: VNM, MSN
-   - 10% Large-cap khác: FPT (nếu tin vào tech)
-2. 30% trái phiếu (15% chính phủ + 15% DN)
-3. 15% tiền mặt (sẵn sàng tích lũy nếu giảm)
+Portfolio Allocation (B4, Risk 85%):
+1. 20% Cổ phiếu (chỉ defensive):
+   - 15% VNCONS: VNM (100%) - Consumer Staples
+   - 5% VNFIN: VCB (nếu muốn giữ Large-cap)
+2. 40% Trái phiếu chính phủ VN (an toàn tuyệt đối)
+3. 20% Tiền mặt
+4. 10% USD (phòng vệ FX)
+5. 10% Gold (safe haven)
+6. TUYỆT ĐỐI TRÁNH:
+   - VNREAL (VHM, VIC, NVL) - rủi ro vỡ nợ
+   - Smallcap - thanh khoản kém
+   - VNIND (HPG, HSG) - cyclical underperform
+   - Margin - rủi ro thanh lý
+
+Waiting for Signal:
+- Risk Score giảm xuống < 60% (B2)
+- VNREAL bắt đầu hồi phục
+- Transition Matrix cho thấy B4 → B3 → B2
+```
+
+**KẾT QUẢ:**
+- Danh mục chỉ giảm -3% (VNM +3%, TPCP giữ giá trị)
+- VNINDEX giảm -9.5%
+- Outperform thị trường +6.5%
+- Bảo toàn vốn thành công, sẵn sàng quay lại Q1/2023
+
+---
+
+#### **Case 9C: B2 - Transition Phase (Q3/2023)**
+```
+Bucket: B2 (chuyển từ B3 → B2 → B1?)
+RiskScore: 52%
+VNINDEX: -0.5%/tháng
+
+SECTOR ROTATION ANALYSIS:
+─────────────────────────────────────────────────────────
+⭐ TOP 3 OUTPERFORM:
+🥇 VNFIN    +1.5%   Win:62%   #1 (VCB +2%, BID +1.8%)
+🥈 VNCONS   +0.8%   Win:58%   #2 (VNM +1.3%)
+🥉 VNIND    -0.2%   Win:52%   #3 (HPG -0.7%)
+
+⚠ BOTTOM 3 UNDERPERFORM:
+🔻 VNREAL   -2.2%   Win:38%   #4 (VHM -2.7%, còn yếu)
+
+Sector Tip: B2: Cân bằng cyclical & defensive, quan sát top sectors
+Chiến lược: 🟡 B2: Cân bằng, theo dõi chuyển bucket
+Timing: ➡ Risk ổn định → Duy trì vị thế
+─────────────────────────────────────────────────────────
+```
+
+**DATA:**
+- **VNINDEX**: 1,000 → 995 điểm (-0.5%)
+- **VN30**: 1,050 → 1,055 (+0.5%, Large-cap tốt hơn)
+- **Smallcap**: -3.2% (vẫn underperform)
+
+**PHÂN TÍCH:**
+1. **VNFIN (#1, +1.5% RR)**:
+   - VCB +2%, BID +1.8% (Large-cap banking hồi phục)
+   - Win Rate 62% → Bắt đầu ổn định
+   - Dẫn đầu phục hồi từ B3
+
+2. **VNCONS (#2, +0.8% RR)**:
+   - VNM +1.3% (vẫn là defensive play tốt)
+   - Win Rate 58% → Tin cậy
+
+3. **VNREAL (#4, -2.2% RR)**:
+   - VHM -2.7% (vẫn yếu, chưa hết áp lực)
+   - Win Rate 38% → Chưa nên mua
+
+**KẾT LUẬN:**
+- B2 = Transition → Thị trường chưa rõ hướng
+- VNFIN outperform → Tín hiệu tích cực (dẫn đầu bull cycle)
+- VNREAL vẫn underperform → Khủng hoảng BĐS chưa qua
+- VN30 > VNINDEX → Large-cap được ưa chuộng hơn
+
+**HÀNH ĐỘNG ĐẦU TƯ:**
+```
+Portfolio Allocation (B2, Risk 52%):
+1. 55% Cổ phiếu (tập trung Large-cap):
+   - 25% VNFIN: VCB (12%), BID (8%), CTG (5%)
+   - 20% VNCONS: VNM (12%), MSN (8%)
+   - 10% VN30 ETF (đa dạng hóa)
+2. 30% Trái phiếu (15% TPCP + 15% DN)
+3. 15% Tiền mặt (sẵn sàng tích lũy nếu B2 → B1)
 4. TRÁNH:
-   - Small-cap (rủi ro cao, không đủ thanh khoản)
-   - Real Estate (còn áp lực)
-5. Theo dõi Transition Matrix:
-   - Nếu B2 → B1: Tăng tỷ trọng lên 70%
-   - Nếu B2 → B3: Giảm xuống 40%
+   - VNREAL (VHM, VIC) - vẫn rủi ro cao
+   - Smallcap - chưa hồi phục
+5. THEO DÕI:
+   - Transition Matrix: B2 → B1 (60% probability?)
+   - Risk Score giảm xuống < 40% → Mua thêm
+   - VNREAL bắt đầu RR% > 0 → Tín hiệu phục hồi
+
+Strategy Adjustment:
+- Nếu tháng sau chuyển B2 → B1: Tăng equity lên 70%
+- Nếu tháng sau B2 → B3: Giảm equity xuống 40%
 ```
 
-**Kết Quả:**
-- Danh mục tăng +0.5% (VCB +1.8%, VNM +0.8%)
-- VNINDEX -0.3%
-- Tháng sau: Chuyển sang B1 → Tăng tỷ trọng thành công
+**KẾT QUẢ:**
+- Tháng 1: Danh mục +0.8% (VCB +2%, VNM +1.3%)
+- Tháng 2: Risk Score giảm xuống 38% (B1) → Tăng equity lên 70%
+- Tháng 3: VNINDEX rally +5% → Danh mục +6.5%
+- Timing chuyển bucket đúng lúc → Outperform +4% trong Q3
 
 ---
 
-### **10.5. Ma Trận Quyết Định: Bucket × Sector**
+### **10.5. Ma Trận Quyết Định: Bucket × Sector × Market Cap**
 
 ```
-Khi RISK SCORE thay đổi → Luân chuyển ngành tự động:
+┌───────────────────────────────────────────────────────────────────┐
+│                    SECTOR ROTATION STRATEGY                        │
+├───────┬──────────┬─────────────────┬─────────────────┬────────────┤
+│Bucket │ Risk     │ TOP SECTORS     │ AVOID SECTORS   │ Market Cap │
+├───────┼──────────┼─────────────────┼─────────────────┼────────────┤
+│ B0    │ 0-20%    │ VNIND, VNFIN    │ Defensive       │ SMALLCAP > │
+│       │          │ (Cyclical boom) │ (VNM boring)    │ MIDCAP >   │
+│       │          │                 │                 │ VN30       │
+├───────┼──────────┼─────────────────┼─────────────────┼────────────┤
+│ B1    │ 20-40%   │ VNFIN, VNCONS   │ VNREAL (watch)  │ VN30 ≈     │
+│       │          │ (Quality Growth)│                 │ VNINDEX    │
+├───────┼──────────┼─────────────────┼─────────────────┼────────────┤
+│ B2    │ 40-60%   │ VNCONS, VN30    │ VNREAL,         │ VN30 >     │
+│       │          │ (Defensive tilt)│ SMALLCAP        │ SMALLCAP   │
+├───────┼──────────┼─────────────────┼─────────────────┼────────────┤
+│ B3    │ 60-80%   │ VNCONS (VNM)    │ VNREAL, VNIND   │ VN30 >>    │
+│       │          │ (Only Staples)  │ All Cyclicals   │ SMALLCAP   │
+├───────┼──────────┼─────────────────┼─────────────────┼────────────┤
+│ B4    │ 80-100%  │ Cash, Gold, USD │ ALL STOCKS      │ Exit All   │
+│       │          │ TPCP            │                 │            │
+└───────┴──────────┴─────────────────┴─────────────────┴────────────┘
 
-┌─────────────────────────────────────────────────────────┐
-│  B0 (0-20%)  →  Technology, Small-cap, Growth           │
-│       ↓ (Risk tăng)                                      │
-│  B1 (20-40%) →  Banking, Consumer, Quality Large-cap    │
-│       ↓ (Risk tăng)                                      │
-│  B2 (40-60%) →  Large-cap phòng thủ, giảm Mid/Small     │
-│       ↓ (Risk tăng)                                      │
-│  B3 (60-80%) →  CHỈ Consumer Staples (VNM), VCB         │
-│       ↓ (Risk tăng)                                      │
-│  B4 (80-100%)→  EXIT: Tiền mặt, Gold, USD               │
-└─────────────────────────────────────────────────────────┘
+Visual Indicators in Panel 9:
+🟢 = Performance > +2% (Strong outperform)
+🟡 = Performance 0% to +2% (Moderate)
+🟠 = Performance -2% to 0% (Weak)
+🔴 = Performance < -2% (Underperform)
+
+⭐ = Win Rate > 60% (Highly reliable)
+✓ = Win Rate > 50% (Reliable)
+⚠ = Win Rate ≤ 50% (Unstable)
+```
+
+**Quick Decision Rules:**
+```
+IF current_bucket == B0 or B1:
+    → Focus: TOP 3 sectors in panel
+    → Strategy: 70-80% equity, overweight Top #1 sector
+    → Market Cap: Increase Smallcap/Midcap exposure
+
+ELSE IF current_bucket == B2:
+    → Focus: TOP 2 sectors only
+    → Strategy: 50-60% equity, balanced Large-cap
+    → Market Cap: Prefer VN30, reduce Smallcap
+
+ELSE IF current_bucket >= B3:
+    → Focus: ONLY VNCONS (if RR% > 0)
+    → Strategy: 20-40% equity, defensive only
+    → Market Cap: VN30 only (VNM, VCB)
+    → Exit: All VNREAL, VNIND, Smallcap immediately
 ```
 
 ---
 
-### **10.6. Checklist Hàng Tuần: Market & Sector**
+### **10.6. Cách Sử Dụng Panel 9 Trong Thực Tế**
+
+#### **Bước 1: Xác Định Bucket Hiện Tại**
+```
+1. Xem Panel 5 (RiskScore & Forecast) → current_bucket
+2. Đọc Panel 9 header: "MARKET PERFORMANCE - Bucket B1 (20-40%)"
+3. Đọc "Bối cảnh":
+   - 💚 B0: "RỦI RO RẤT THẤP - Thị trường thuận lợi"
+   - 🟢 B1: "RỦI RO THẤP - Vẫn tích cực"
+   - 🟡 B2: "RỦI RO VỪA - Thận trọng, cân bằng"
+   - 🟠 B3: "RỦI RO CAO - Giảm tỷ trọng"
+   - 🔴 B4: "RỦI RO RẤT CAO - Bảo toàn vốn"
+```
+
+#### **Bước 2: Phân Tích Market Performance**
+```
+1. Xem bảng MARKET PERFORMANCE:
+   Index      AvgR%    Win%    N
+   VNINDEX    +2.5%    ⭐65%    45
+   VN30       +2.8%    ⭐68%    45
+   SMALLCAP   +3.5%    ⭐70%    40
+
+2. So sánh performance:
+   - SMALLCAP > VN30 > VNINDEX → Risk-on, bull market
+   - VN30 > VNINDEX > SMALLCAP → Risk-off, flight to quality
+
+3. Kiểm tra Win Rate:
+   - ⭐ > 60%: Tin cậy cao → An tâm đầu tư
+   - ✓ 50-60%: Trung bình → Thận trọng
+   - ⚠ < 50%: Không ổn định → Tránh
+
+4. Xem Extended Metrics (nếu cần dài hạn):
+   - R20%: Kỳ vọng return 1 tháng
+   - DD20%: Rủi ro drawdown 1 tháng
+   - R60%: Xu hướng 3 tháng
+```
+
+#### **Bước 3: Sector Rotation Analysis**
+```
+1. Xem "⭐ TOP 3 OUTPERFORM":
+   🥇 VNFIN    +1.8%   Win:72%   #1
+   🥈 VNCONS   +0.9%   Win:65%   #2
+   🥉 VNIND    +0.5%   Win:58%   #3
+
+2. Xem "⚠ BOTTOM 3 UNDERPERFORM":
+   🔻 VNREAL   -1.2%   Win:42%   #4
+
+3. Decision:
+   - Tăng tỷ trọng Top #1, #2 (VNFIN, VNCONS)
+   - Giảm/Tránh Bottom (VNREAL)
+   - Top #3 (VNIND) → Giữ nhỏ nếu muốn đa dạng hóa
+```
+
+#### **Bước 4: Đọc Strategy Recommendation**
+```
+Panel 9 tự động đưa ra 3 gợi ý:
+
+1. Sector Tip:
+   "B0-B1: Ưu tiên cyclical (VNFIN, VNIND), midcap/smallcap"
+   → Biết ngay nên focus vào sector nào
+
+2. Chiến lược:
+   "✅ B1: Duy trì equity cao, chọn top performers"
+   → Biết tỷ trọng cổ phiếu nên ở mức nào
+
+3. Timing:
+   "📈 Risk giảm dần → Cơ hội tích lũy"
+   → Biết nên mua thêm hay chốt lời
+```
+
+#### **Bước 5: Kết Hợp Transition Matrix (Panel 5)**
+```
+1. Xem Panel 5 → Transition Matrix:
+   Current B1 → Next bar:
+   - B0: 15% (giảm risk)
+   - B1: 65% (giữ nguyên)
+   - B2: 20% (tăng risk)
+
+2. Decision based on probability:
+   - Nếu 60%+ khả năng B1 → B0:
+     → Tăng tỷ trọng sớm (SMALLCAP, VNIND)
+
+   - Nếu 60%+ khả năng ở lại B1:
+     → Duy trì, focus Top sectors
+
+   - Nếu 40%+ khả năng B1 → B2:
+     → Giảm dần Smallcap, tăng Defensive
+```
+
+#### **Bước 6: Xây Dựng Portfolio**
+```
+Example: Bucket B1, Risk 25%
+
+Từ Panel 9:
+- TOP 3: VNFIN (+1.8%), VNCONS (+0.9%), VNIND (+0.5%)
+- AVOID: VNREAL (-1.2%)
+- Market: SMALLCAP (+3.5%) outperform
+- Strategy: "Duy trì equity cao, chọn top performers"
+
+Portfolio Construction:
+┌──────────────────────────────────────────────────────┐
+│ 70% Cổ phiếu:                                        │
+│   ├─ 25% VNFIN (Top #1): VCB 10%, TCB 8%, MBB 7%    │
+│   ├─ 20% VNCONS (Top #2): VNM 10%, MSN 10%          │
+│   ├─ 15% VNIND (Top #3): HPG 8%, HSG 7%             │
+│   └─ 10% Smallcap: DGW 5%, DBC 5%                   │
+│ 20% Trái phiếu: 10% TPCP + 10% DN                   │
+│ 10% Tiền mặt (sẵn sàng mua thêm nếu B1 → B0)        │
+│                                                       │
+│ TRÁNH: 0% VNREAL (VHM, VIC, NVL)                    │
+└──────────────────────────────────────────────────────┘
+
+Expected Return (from Panel 9):
+- 1 tháng (R20%): +5-6%
+- 3 tháng (R60%): +15-18%
+- Risk (DD20%): -3% max drawdown
+```
+
+---
+
+### **10.7. Checklist Hàng Tuần: Market & Sector**
 
 ```markdown
-☐ 1. Xác định Bucket hiện tại (từ Panel 5):
-   - B0/B1: Tấn công với Growth stocks
-   - B2: Cân bằng với Large-cap
-   - B3/B4: Phòng thủ hoặc Exit
+☐ 1. Xác định Bucket hiện tại (Panel 5 + Panel 9 header):
+   Ghi chú: B___ (Risk: __%)
 
-☐ 2. So sánh sector performance 4 tuần gần nhất:
-   - Top 3 performers: Tăng tỷ trọng
-   - Bottom 3 performers: Giảm hoặc tránh
+☐ 2. Kiểm tra Market Performance trend:
+   □ SMALLCAP > VNINDEX? → Risk-on (bull)
+   □ VN30 > SMALLCAP? → Risk-off (bear)
+   □ Win Rate của các index > 60%? → Tin cậy cao
 
-☐ 3. Kết hợp với Transition Matrix:
-   - Nếu 60% khả năng B1 → B0: Bắt đầu mua Tech/Small-cap
-   - Nếu 50% khả năng B2 → B3: Bắt đầu bán Real Estate/Small-cap
+☐ 3. Phân tích Sector Rotation:
+   □ TOP #1 sector: _______ (RR%: ___%, Win: ___%)
+   □ TOP #2 sector: _______ (RR%: ___%, Win: ___%)
+   □ BOTTOM sector: _______ (RR%: ___%, Win: ___%)
 
-☐ 4. Review danh mục:
-   - Có đang nắm giữ Bottom performers? → Cắt lỗ hoặc chốt lời
-   - Có bỏ lỡ Top performers? → Nghiên cứu để mua
+☐ 4. So sánh với portfolio hiện tại:
+   □ Đang nắm giữ TOP sectors? → Giữ
+   □ Đang nắm giữ BOTTOM sectors? → Cắt lỗ/Chốt lời
+   □ Bỏ lỡ TOP sectors? → Nghiên cứu để mua
 
-☐ 5. Lưu ý đặc biệt:
-   - VNM luôn là nơi trú ẩn tốt nhất trong B3/B4
-   - Small-cap rất rủi ro trong B2-B4, chỉ phù hợp B0-B1
-   - Banking ổn định trong mọi Bucket (trừ B4)
+☐ 5. Kết hợp Transition Matrix (Panel 5):
+   □ Khả năng bucket tăng/giảm tháng sau?
+   □ Nếu B1 → B0 (>50%): Tăng Smallcap/Cyclical
+   □ Nếu B1 → B2 (>40%): Giảm Smallcap, tăng Defensive
+
+☐ 6. Đọc Strategy Recommendation:
+   □ Sector Tip: _______________________________
+   □ Chiến lược: _______________________________
+   □ Timing: _______________________________
+
+☐ 7. Điều chỉnh portfolio (nếu cần):
+   □ Tăng tỷ trọng: _______ (sector/stock)
+   □ Giảm tỷ trọng: _______ (sector/stock)
+   □ Giữ nguyên: _______ (sector/stock)
+
+☐ 8. Lưu ý đặc biệt:
+   □ VNREAL RR% < -2% liên tục 2 tháng? → Cảnh báo khủng hoảng BĐS
+   □ VNIND RR% > +2% trong B0/B1? → Cyclical boom
+   □ VNCONS (VNM) là TOP #1 trong B3/B4? → Defensive play duy nhất
+   □ Smallcap underperform liên tục? → Cảnh báo thanh khoản kém
 ```
+
+---
+
+### **10.8. Lưu Ý Quan Trọng**
+
+#### **⚠️ Cẩn Trọng Khi:**
+1. **Win Rate < 50%**:
+   - Sector không ổn định, RR% dao động mạnh
+   - Tránh overweight, chỉ giữ tỷ trọng nhỏ
+
+2. **N (Sample size) < min_N_display**:
+   - "⚠ Chưa đủ dữ liệu" → Chờ thêm data
+   - Script cần ít nhất 10-15 samples để tin cậy
+
+3. **TOP sector thay đổi liên tục**:
+   - Tuần 1: VNFIN #1 → Tuần 2: VNIND #1 → Tuần 3: VNCONS #1
+   - → Thị trường chưa rõ hướng (thường ở B2)
+   - → Chọn Large-cap đa dạng hóa thay vì sector rotation
+
+4. **Bottom sector quá nhiều (-4 sectors underperform)**:
+   - → Market-wide selloff (Crisis mode)
+   - → Chuyển sang Cash/Gold/TPCP (B4 strategy)
+
+#### **✅ Tin Cậy Cao Khi:**
+1. **Win Rate > 60% + RR% > +1%**:
+   - TOP sector rất ổn định
+   - Có thể overweight lên 30-40% danh mục
+
+2. **TOP #1 giữ vững >3 tuần liên tục**:
+   - Trend rõ ràng, không đảo chiều
+   - Tăng tỷ trọng dần qua các tuần
+
+3. **R20% > +5% và DD20% < 3%**:
+   - Return cao, risk thấp
+   - Cơ hội tốt để tăng leverage (margin 20-30%)
+
+4. **Bucket ổn định (B1 → B1 → B1)**:
+   - Không thay đổi bucket → Không cần điều chỉnh nhiều
+   - Focus vào sector rotation trong bucket
+
+---
+
+### **10.9. So Sánh Panel 9 vs Traditional Analysis**
+
+| **Tiêu chí**        | **Panel 9 (VnBondLab)**                         | **Traditional Technical Analysis** |
+| ------------------- | ----------------------------------------------- | ---------------------------------- |
+| **Data Source**     | 4 sector indices (VNFIN, VNREAL, VNCONS, VNIND) | Individual stocks                  |
+| **Benchmark**       | Relative Return vs VNINDEX                      | Absolute Return                    |
+| **Context**         | Theo Bucket rủi ro (B0-B4)                      | Không phân theo risk regime        |
+| **Ranking**         | Tự động xếp hạng 1-4                            | Manual comparison                  |
+| **Win Rate**        | % lần outperform trong lịch sử                  | Không có                           |
+| **Forward Looking** | R20%, R60% (kỳ vọng return)                     | Backward looking                   |
+| **Risk Measure**    | DD20% (drawdown)                                | Standard deviation                 |
+| **Strategy Guide**  | Tự động gợi ý theo bucket                       | Tự quyết định                      |
+
+**Ví Dụ So Sánh:**
+```
+Traditional Analysis:
+"HPG tăng 5% tuần này, MACD golden cross, RSI 65 → Mua"
+
+Panel 9 Analysis:
+"VNIND (HPG sector) là TOP #1 với RR% +3.2%, Win Rate 75%
+Bucket B1 (Risk 25%) → Chiến lược: Ưu tiên cyclical
+Timing: Risk giảm dần → Cơ hội tích lũy
+→ Mua HPG với tỷ trọng 8-10%, kỳ vọng +5.2% trong R20%"
+
+→ Panel 9 cung cấp:
+  - Context (Bucket B1, Risk regime)
+  - Comparison (RR% so với VNINDEX)
+  - Reliability (Win Rate 75%)
+  - Strategy (Ưu tiên cyclical trong B1)
+  - Timing (Risk giảm dần)
+  - Expected Return (R20% +5.2%)
+```
+
+---
+
+### **10.10. Kết Luận: Panel 9 - Market & Sector**
+
+**Vai Trò Của Panel 9:**
+- **Sector Rotation**: Biết ngành nào outperform/underperform
+- **Market Cap Rotation**: Biết Smallcap/Midcap/VN30 nào mạnh hơn
+- **Risk-Adjusted Strategy**: Portfolio allocation theo bucket
+- **Timing**: Kết hợp Transition Matrix để dự đoán chuyển bucket
+
+**Workflow Tối Ưu:**
+```
+1. Panel 5 → Xác định current_bucket + risk_forecast
+2. Panel 9 → Sector Rotation + Market Performance
+3. Panel 8 → Transition Matrix (khả năng chuyển bucket)
+4. Decision: Adjust portfolio theo TOP sectors + bucket strategy
+```
+
+**Nguyên Tắc Vàng:**
+```
+✅ LUÔN LUÔN:
+- Follow TOP 3 sectors trong bucket hiện tại
+- Tránh BOTTOM sectors (RR% < -1%)
+- Ưu tiên High Win Rate (>60%)
+- Kết hợp với Transition Matrix
+
+🟡 CÂN NHẮC:
+- Sector rotation chỉ hiệu quả trong B0-B2
+- B3-B4: Chỉ focus VNCONS (VNM) hoặc Exit
+- N < min_N_display: Chờ thêm data
+
+🔴 TUYỆT ĐỐI TRÁNH:
+- Mua BOTTOM sectors với Win Rate < 40%
+- Overweight sector khi N < 10
+- Ignore bucket context (mua cyclical trong B4)
+- Fight the trend (mua VNREAL khi underperform 3 tháng liên tục)
+```
+
+**Case Study Highlight:**
+- **B0/B1**: VNIND (+3.2% RR) → HPG +18% trong Q1/2021
+- **B3/B4**: VNCONS (+1.2% RR) → VNM +3% khi VNINDEX -9.5%
+- **B2**: VNFIN (+1.5% RR) → VCB +2% dẫn đầu phục hồi
+
+→ Sector Rotation đúng lúc → Outperform thị trường 4-6%/quý!
 
 ---
 
